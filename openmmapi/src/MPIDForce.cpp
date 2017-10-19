@@ -41,7 +41,8 @@ using std::string;
 using std::vector;
 
 MPIDForce::MPIDForce() : nonbondedMethod(NoCutoff), polarizationType(Mutual), pmeBSplineOrder(6), cutoffDistance(1.0), ewaldErrorTol(1e-4), mutualInducedMaxIterations(60),
-                                               mutualInducedTargetEpsilon(1.0e-02), scalingDistanceCutoff(100.0), electricConstant(138.9354558456), alpha(0.0), nx(0), ny(0), nz(0) {
+                                               mutualInducedTargetEpsilon(1.0e-02), scalingDistanceCutoff(100.0), electricConstant(138.9354558456), defaultThole(0.3),
+                                               alpha(0.0), nx(0), ny(0), nz(0) {
     extrapolationCoefficients.push_back(-0.154);
     extrapolationCoefficients.push_back(0.017);
     extrapolationCoefficients.push_back(0.658);
@@ -255,6 +256,14 @@ void MPIDForce::getCovalentMaps(int index, std::vector< std::vector<int> >& cova
         }
         covalentLists[jj] = covalentAtoms;
     }
+}
+
+void MPIDForce::setDefaultTholeWidth(double val) {
+    defaultThole = val;
+}
+
+double MPIDForce::getDefaultTholeWidth() const {
+    return defaultThole;
 }
 
 void MPIDForce::getInducedDipoles(Context& context, vector<Vec3>& dipoles) {

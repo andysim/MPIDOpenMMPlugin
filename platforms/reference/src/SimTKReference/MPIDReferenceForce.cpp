@@ -36,9 +36,10 @@ using namespace OpenMM;
 MPIDReferenceForce::MPIDReferenceForce() :
                                                    _nonbondedMethod(NoCutoff),
                                                    _numParticles(0),
-                                                   _electric(138.9354558456),
+                                                   _electric(138.93875744/*138.935455846*/),
                                                    _dielectric(1.0),
                                                    _mutualInducedDipoleConverged(0),
+                                                   _defaultTholeWidth(0.3),
                                                    _mutualInducedDipoleIterations(0),
                                                    _maximumMutualInducedDipoleIterations(100),
                                                    _mutualInducedDipoleEpsilon(1.0e+50),
@@ -52,9 +53,10 @@ MPIDReferenceForce::MPIDReferenceForce() :
 MPIDReferenceForce::MPIDReferenceForce(NonbondedMethod nonbondedMethod) :
                                                    _nonbondedMethod(nonbondedMethod),
                                                    _numParticles(0),
-                                                   _electric(138.9354558456),
+                                                   _electric(138.93875744/*138.935455846*/),
                                                    _dielectric(1.0),
                                                    _mutualInducedDipoleConverged(0),
+                                                   _defaultTholeWidth(0.3),
                                                    _mutualInducedDipoleIterations(0),
                                                    _maximumMutualInducedDipoleIterations(100),
                                                    _mutualInducedDipoleEpsilon(1.0e+50),
@@ -67,34 +69,19 @@ MPIDReferenceForce::MPIDReferenceForce(NonbondedMethod nonbondedMethod) :
 
 void MPIDReferenceForce::initialize()
 {
-
     unsigned int index    = 0;
     _mScale[index++]      = 0.0;
     _mScale[index++]      = 0.0;
     _mScale[index++]      = 0.0;
-    _mScale[index++]      = 0.4;
-    _mScale[index++]      = 0.8;
+    _mScale[index++]      = 1.0;
+    _mScale[index++]      = 1.0;
 
-    index                 = 0;
-    _dScale[index++]      = 0.0;
-    _dScale[index++]      = 1.0;
-    _dScale[index++]      = 1.0;
-    _dScale[index++]      = 1.0;
-    _dScale[index++]      = 1.0;
-
-    index                 = 0;
+    index    = 0;
     _pScale[index++]      = 0.0;
     _pScale[index++]      = 0.0;
     _pScale[index++]      = 0.0;
     _pScale[index++]      = 1.0;
     _pScale[index++]      = 1.0;
-
-    index                 = 0;
-    _uScale[index++]      = 1.0;
-    _uScale[index++]      = 1.0;
-    _uScale[index++]      = 1.0;
-    _uScale[index++]      = 1.0;
-    _uScale[index++]      = 1.0;
 }
 
 MPIDReferenceForce::NonbondedMethod MPIDReferenceForce::getNonbondedMethod() const
@@ -115,6 +102,16 @@ MPIDReferenceForce::PolarizationType MPIDReferenceForce::getPolarizationType() c
 void MPIDReferenceForce::setPolarizationType(MPIDReferenceForce::PolarizationType polarizationType)
 {
     _polarizationType = polarizationType;
+}
+
+double MPIDReferenceForce::getDefaultTholeWidth() const
+{
+    return _defaultTholeWidth;
+}
+
+void MPIDReferenceForce::setDefaultTholeWidth(double width)
+{
+    _defaultTholeWidth = width;
 }
 
 int MPIDReferenceForce::getMutualInducedDipoleConverged() const
@@ -201,7 +198,6 @@ void MPIDReferenceForce::setupScaleMaps(const vector< vector< vector<int> > >& m
         _scaleMaps[ii].resize(LAST_SCALE_TYPE_INDEX);
         _maxScaleIndex[ii] = 0;
         const vector< vector<int> >& covalentInfo = multipoleParticleCovalentInfo[ii];
-        const vector<int> covalentListP11              = covalentInfo[MPIDForce::PolarizationCovalent11];
 
         // pScale & mScale
 
@@ -209,32 +205,8 @@ void MPIDReferenceForce::setupScaleMaps(const vector< vector< vector<int> > >& m
             for (int covalentIndex : covalentInfo[jj]) {
                 if (covalentIndex < ii)
                     continue;
-
-                // handle 0.5 factor for p14
-
-                int hit = 0;
-                if (jj == MPIDForce::Covalent14) {
-                    for (int mm : covalentListP11) {
-                        if (mm == covalentIndex) {
-                            hit = 1;
-                            break;
-                        }
-                    }
-                }
-
-                _scaleMaps[ii][P_SCALE][covalentIndex] = hit ? 0.5*_pScale[jj+1] : _pScale[jj+1];
                 _scaleMaps[ii][M_SCALE][covalentIndex] = _mScale[jj+1];
-                _maxScaleIndex[ii]                     = _maxScaleIndex[ii] < covalentIndex ? covalentIndex : _maxScaleIndex[ii];
-            }
-        }
-
-        // dScale & uScale
-
-        for (unsigned jj = MPIDForce::PolarizationCovalent11; jj < covalentInfo.size(); jj++) {
-            for (int covalentIndex : covalentInfo[jj]) {
-                if (covalentIndex < ii)continue;
-                _scaleMaps[ii][D_SCALE][covalentIndex] = _dScale[jj-4];
-                _scaleMaps[ii][U_SCALE][covalentIndex] = _uScale[jj-4];
+                _scaleMaps[ii][P_SCALE][covalentIndex] = _pScale[jj+1];
                 _maxScaleIndex[ii]                     = _maxScaleIndex[ii] < covalentIndex ? covalentIndex : _maxScaleIndex[ii];
             }
         }
@@ -255,16 +227,14 @@ double MPIDReferenceForce::getMultipoleScaleFactor(unsigned int particleI, unsig
 
 void MPIDReferenceForce::getDScaleAndPScale(unsigned int particleI, unsigned int particleJ, double& dScale, double& pScale) const
 {
-    dScale = getMultipoleScaleFactor(particleI, particleJ, D_SCALE);
     pScale = getMultipoleScaleFactor(particleI, particleJ, P_SCALE);
+    dScale = pScale;
 }
 
 void MPIDReferenceForce::getMultipoleScaleFactors(unsigned int particleI, unsigned int particleJ, vector<double>& scaleFactors) const
 {
-    scaleFactors[D_SCALE] = getMultipoleScaleFactor(particleI, particleJ, D_SCALE);
     scaleFactors[P_SCALE] = getMultipoleScaleFactor(particleI, particleJ, P_SCALE);
     scaleFactors[M_SCALE] = getMultipoleScaleFactor(particleI, particleJ, M_SCALE);
-    scaleFactors[U_SCALE] = getMultipoleScaleFactor(particleI, particleJ, U_SCALE);
 }
 
 double MPIDReferenceForce::normalizeVec3(Vec3& vectorToNormalize) const
@@ -855,7 +825,6 @@ void MPIDReferenceForce::calculateFixedMultipoleFieldPairIxn(const MultipolePart
     // get scaling factors, if needed
 
     getAndScaleInverseRs(particleI.dampingFactor, particleJ.dampingFactor, particleI.thole, particleJ.thole, r, rrI);
-
     double rr3    = rrI[0];
     double rr5    = rrI[1];
     double rr7    = rrI[2];
@@ -1415,9 +1384,9 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
         rInvVec[i] = rInvVec[i-1] * rInv;
 
     double mScale = scalingFactors[M_SCALE];
-    double dScale = scalingFactors[D_SCALE];
     double pScale = scalingFactors[P_SCALE];
-    double uScale = scalingFactors[U_SCALE];
+    double dScale = pScale;
+    double uScale = 1.0;
 
     double dmp = particleI.dampingFactor*particleK.dampingFactor;
     double a = particleI.thole < particleK.thole ? particleI.thole : particleK.thole;
@@ -2490,17 +2459,15 @@ void MPIDReferencePmeForce::getDampedInverseDistances(const MultipoleParticleDat
     if (damp != 0.0) {
 
         double ratio   = (r/damp);
-               ratio   = ratio*ratio*ratio;
 
-        double pgamma  = particleI.thole < particleJ.thole ? particleI.thole : particleJ.thole;
-               damp    = -pgamma*ratio;
-
-        if (damp > -50.0) {
-            double expdamp = exp(damp);
-            scaleFactor[0] = 1.0 - expdamp;
-            scaleFactor[1] = 1.0 - expdamp*(1.0-damp);
-            scaleFactor[2] = 1.0 - expdamp*(1.0-damp+(0.6*damp*damp));
-            scaleFactor[3] = 1.0 - expdamp*(1.0-damp+(18.0*damp*damp-9*damp*damp*damp)/35.0);
+        double pgamma  = pscale == 0.0 ? particleI.thole + particleJ.thole : _defaultTholeWidth;
+               damp    = pgamma*ratio;
+        if (damp < 50.0) {
+            double expdamp = exp(-damp);
+            scaleFactor[0] = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp);
+            scaleFactor[1] = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0);
+            scaleFactor[2] = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0 + damp*damp*damp*damp/30.0);
+            scaleFactor[3] = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0 + 4.0*damp*damp*damp*damp/105.0 + damp*damp*damp*damp*damp/210.0);
         }
     }
 
@@ -2728,7 +2695,6 @@ void MPIDReferencePmeForce::calculateFixedMultipoleFieldPairIxn(const MultipoleP
     fjp += -oI*(3.0*prr7) + deltaR*prr9*oI.dot(deltaR);
 
     // increment the field at each site due to this interaction
-
 
     _fixedMultipoleField[iIndex]      += fim - fid;
     _fixedMultipoleField[jIndex]      += fjm - fjd;
@@ -4106,13 +4072,15 @@ void MPIDReferencePmeForce::calculateDirectInducedDipolePairIxn(unsigned int iIn
 }
 
 void MPIDReferencePmeForce::calculateDirectInducedDipolePairIxns(const MultipoleParticleData& particleI,
-                                                                            const MultipoleParticleData& particleJ,
-                                                                            vector<UpdateInducedDipoleFieldStruct>& updateInducedDipoleFields)
+                                                                 const MultipoleParticleData& particleJ,
+                                                                 vector<UpdateInducedDipoleFieldStruct>& updateInducedDipoleFields)
 {
 
     // compute the real space portion of the Ewald summation
 
     double uscale = 1.0;
+    double pscale = getMultipoleScaleFactor(particleI.particleIndex, particleJ.particleIndex, P_SCALE);
+
     Vec3 deltaR = particleJ.position - particleI.position;
 
     // periodic boundary conditions
@@ -4151,15 +4119,13 @@ void MPIDReferencePmeForce::calculateDirectInducedDipolePairIxns(const Multipole
     if (damp != 0.0) {
 
         double ratio = (r/damp);
-               ratio = ratio*ratio*ratio;
-        double pgamma = particleI.thole < particleJ.thole ? particleI.thole : particleJ.thole;
-               damp   = -pgamma*ratio;
-
-        if (damp > -50.0) {
-            double expdamp = expf(damp);
-            scale3        = 1.0 - expdamp;
-            scale5        = 1.0 - expdamp*(1.0-damp);
-            scale7        = 1.0 - (1.0 - damp + (0.6*damp*damp))*expdamp;
+        double pgamma  = pscale == 0.0 ? particleI.thole + particleJ.thole : _defaultTholeWidth;
+               damp    = pgamma*ratio;
+        if (damp < 50.0) {
+            double expdamp = exp(-damp);
+            scale3 = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp);
+            scale5 = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0);
+            scale7 = 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0 + damp*damp*damp*damp/30.0);
         }
     }
     double dsc3        = uscale*scale3;
@@ -4434,9 +4400,9 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     double erfAlphaR = erf(alphaRVec[1]);
     double X = 2.0*exp(-alphaRVec[2])/SQRT_PI;
     double mScale = scalingFactors[M_SCALE];
-    double dScale = scalingFactors[D_SCALE];
     double pScale = scalingFactors[P_SCALE];
-    double uScale = scalingFactors[U_SCALE];
+    double dScale = pScale;
+    double uScale = 1.0;
 
     int doubleFactorial = 1, facCount = 1;
     double tmp = alphaRVec[1];
@@ -4449,29 +4415,31 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     }
 
     double dmp = particleI.dampingFactor*particleJ.dampingFactor;
-    double a = particleI.thole < particleJ.thole ? particleI.thole : particleJ.thole;
+    double a = pScale == 0.0 ? particleI.thole + particleJ.thole : _defaultTholeWidth;
     double u = std::abs(dmp) > 1.0E-5 ? r/dmp : 1E10;
-    double au3 = a*u*u*u;
-    double expau3 = au3 < 50.0 ? exp(-au3) : 0.0;
-    double a2u6 = au3*au3;
-    double a3u9 = a2u6*au3;
-    double a4u12 = a3u9*au3;
+    double au = a*u;
+    double expau = au < 50.0 ? exp(-au) : 0.0;
+    double au2 = au*au;
+    double au3 = au2*au;
+    double au4 = au3*au;
+    double au5 = au4*au;
+    double au6 = au5*au;
     // Thole damping factors for energies
-    double thole_c  = 1.0 - expau3;
-    double thole_d0 = 1.0 - expau3*(1.0 + 1.5*au3);
-    double thole_d1 = 1.0 - expau3;
-    double thole_q0 = 1.0 - expau3*(1.0 + au3 + a2u6);
-    double thole_q1 = 1.0 - expau3*(1.0 + au3);
-    double thole_o0 = 1.0 - expau3*(1.0 + au3 + 0.45*a2u6 + 0.45*a3u9);
-    double thole_o1 = 1.0 - expau3*(1.0 + au3 + 0.60*a2u6);
+    double thole_c   = 1.0 - expau*(1.0 + au + 0.5*au2);
+    double thole_d0  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/4.0);
+    double thole_d1  = 1.0 - expau*(1.0 + au + 0.5*au2);
+    double thole_q0  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/18.0);
+    double thole_q1  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0);
+    double thole_o0  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0 + au5/120.0);
+    double thole_o1  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/30.0);
     // Thole damping factors for derivatives
-    double dthole_c  = 1.0 - expau3*(1.0 + 1.5*au3);
-    double dthole_d0 = 1.0 - expau3*(1.0 + au3 + 1.5*a2u6);
-    double dthole_d1 = 1.0 - expau3*(1.0 + au3);
-    double dthole_q0 = 1.0 - expau3*(1.0 + au3 + 0.25*a2u6 + 0.75*a3u9);
-    double dthole_q1 = 1.0 - expau3*(1.0 + au3 + 0.75*a2u6);
-    double dthole_o0 = 1.0 - expau3*(1.0 + au3 + 0.51*a2u6 - 0.09*a3u9 + 0.27*a4u12);
-    double dthole_o1 = 1.0 - expau3*(1.0 + au3 + 0.48*a2u6 + 0.36*a3u9);
+    double dthole_c  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/4.0);
+    double dthole_d0 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/12.0);
+    double dthole_d1 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0);
+    double dthole_q0 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0 + au5/72.0);
+    double dthole_q1 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0);
+    double dthole_o0 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0 + au5/120.0 + au6/600.0);
+    double dthole_o1 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/25.0 + au5/150.0);
 
     // Now we compute the (attenuated) Coulomb operator and its derivatives, contracted with
     // permanent moments and induced dipoles.  Note that the coefficient of the permanent force

@@ -465,6 +465,20 @@ public:
     void setNonbondedMethod(NonbondedMethod nonbondedMethod);
 
     /**
+     * Get default Thole width.
+     *
+     * @return default Thole width (nm).
+     */
+    double getDefaultTholeWidth() const;
+
+    /**
+     * Set default Thole width.
+     *
+     * @param width The default (used for direct pairs) Thole width in nm
+     */
+    void setDefaultTholeWidth(double width);
+
+    /**
      * Get polarization type.
      * 
      * @return polarization type
@@ -815,13 +829,11 @@ protected:
     double _electric;
     double _dielectric;
 
-    enum ScaleType { D_SCALE, P_SCALE, M_SCALE, U_SCALE, LAST_SCALE_TYPE_INDEX };
+    enum ScaleType { M_SCALE, P_SCALE, LAST_SCALE_TYPE_INDEX };
     std::vector<  std::vector< MapIntRealOpenMM > > _scaleMaps;
     std::vector<unsigned int> _maxScaleIndex;
-    double _dScale[5];
-    double _pScale[5];
     double _mScale[5];
-    double _uScale[5];
+    double _pScale[5];
 
     std::vector<TransformedMultipole> _transformed;
     std::vector<Vec3> _fixedMultipoleField;
@@ -833,6 +845,7 @@ protected:
     std::vector<std::vector<double> > _ptDipoleFieldGradientP;
     std::vector<std::vector<double> > _ptDipoleFieldGradientD;
 
+    double _defaultTholeWidth;
     int _mutualInducedDipoleConverged;
     int _mutualInducedDipoleIterations;
     int _maximumMutualInducedDipoleIterations;
@@ -1331,196 +1344,6 @@ protected:
     virtual void getPeriodicDelta(Vec3& deltaR) const {};
 };
 
-class MPIDReferenceGeneralizedKirkwoodForce : public MPIDReferenceForce {
-
-public:
-
-    /**
-     * Constructor
-     * 
-     */
-    MPIDReferenceGeneralizedKirkwoodForce(MPIDReferenceGeneralizedKirkwoodForce* mpidReferenceGeneralizedKirkwoodForce);
- 
-    /**
-     * Destructor
-     * 
-     */
-    ~MPIDReferenceGeneralizedKirkwoodForce();
- 
-    /**
-     * Get flag signalling whether cavity term is to be included.
-     *
-     * @return flag
-     *
-     */
-    int getIncludeCavityTerm() const;
-
-    /**
-     * Get probe radius.
-     *
-     * @return probe radius
-     *
-     */
-    double getProbeRadius() const;
-
-    /**
-     * Get surface area factor.
-     *
-     * @return surface area factor
-     *
-     */
-    double getSurfaceAreaFactor() const;
-
-    /**
-     * Get dielectric offset.
-     *
-     * @return dielectric offset
-     *
-     */
-    double getDielectricOffset() const;
-
-private:
-
-    MPIDReferenceGeneralizedKirkwoodForce* _mpidReferenceGeneralizedKirkwoodForce;
-
-    double _gkc;
-    double _fc;
-    double _fd;
-    double _fq;
-
-    std::vector<double> _atomicRadii;
-    std::vector<double> _scaledRadii;
-    std::vector<double> _bornRadii;
-    std::vector<double> _bornForce;
-
-    std::vector<Vec3> _gkField;
-    std::vector<Vec3> _inducedDipoleS;
-    std::vector<Vec3> _inducedDipolePolarS;
-    std::vector<std::vector<Vec3> > _ptDipolePS;
-    std::vector<std::vector<Vec3> > _ptDipoleDS;
-    std::vector<std::vector<double> > _ptDipoleFieldGradientPS;
-    std::vector<std::vector<double> > _ptDipoleFieldGradientDS;
-
-    int _includeCavityTerm;
-    double _probeRadius;
-    double _surfaceAreaFactor;
-    double _dielectricOffset;
-
-    /**
-     * Zero fixed multipole fields.
-     *
-     */
-    void zeroFixedMultipoleFields();
-
-    /**
-     * Calculate electric field at particle I due fixed multipoles at particle J and vice versa
-     * (field at particle J due fixed multipoles at particle I).
-     * 
-     * @param particleI               positions and parameters (charge, labFrame dipoles, quadrupoles, ...) for particle I
-     * @param particleJ               positions and parameters (charge, labFrame dipoles, quadrupoles, ...) for particle J
-     * @param dScale                  d-scale value for i-j interaction
-     * @param pScale                  p-scale value for i-j interaction
-     */
-    void calculateFixedMultipoleFieldPairIxn(const MultipoleParticleData& particleI, const MultipoleParticleData& particleJ,
-                                             double dScale, double pScale);
-
-    /**
-     * Calculate induced dipoles.
-     * 
-     * @param particleData      vector of particle positions and parameters (charge, labFrame dipoles, quadrupoles, ...)
-     */
-    void calculateInducedDipoles(const std::vector<MultipoleParticleData>& particleData);
-
-    /**
-     * Calculate fields due induced dipoles at each site.
-     * 
-     * @param particleI                 positions and parameters (charge, labFrame dipoles, quadrupoles, ...) for particle I
-     * @param particleJ                 positions and parameters (charge, labFrame dipoles, quadrupoles, ...) for particle J
-     * @param updateInducedDipoleFields vector of UpdateInducedDipoleFieldStruct containing input induced dipoles and output fields
-     */
-    void calculateInducedDipolePairIxns(const MultipoleParticleData& particleI, const MultipoleParticleData& particleJ,
-                                        std::vector<UpdateInducedDipoleFieldStruct>& updateInducedDipoleFields);
-
-    /**
-     * Calculate electrostatic forces and torques.
-     * 
-     * @param particleData            vector of parameters (charge, labFrame dipoles, quadrupoles, ...) for particles
-     * @param torques                 output torques
-     * @param forces                  output forces 
-     *
-     * @return energy
-     */
-    double calculateElectrostatic(const std::vector<MultipoleParticleData>& particleData, 
-                                  std::vector<OpenMM::Vec3>& torques,
-                                  std::vector<OpenMM::Vec3>& forces);
-
-    /**
-     * Calculate GK field at particle I due induced dipole at particle J and vice versa
-     * (field at particle J due induced dipole at particle I).
-     * 
-     * @param particleI               index of particle I
-     * @param particleJ               index of particle J
-     * @param field                   vector of induced dipole fields
-     * @param fieldPolar              vector of induced dipole polar fields
-     */
-    void calculateInducedDipolePairGkIxn(const MultipoleParticleData& particleI, const MultipoleParticleData& particleJ,
-                                         const std::vector<Vec3>& field, std::vector<Vec3>& fieldPolar) const;
-
-    /**
-     * Calculate Kirkwood interaction.
-     * 
-     * @param particleI               particle parameters (charge, labFrame dipoles, quadrupoles, ...) for particle I
-     * @param particleJ               particle parameters (charge, labFrame dipoles, quadrupoles, ...) for particle J
-     * @param forces                  add Kirkwood force to forces
-     * @param torques                 add Kirkwood torque to torques
-     * @param dBorn                   chain-rule factor
-     *
-     * @return energy
-     */
-    double calculateKirkwoodPairIxn(const MultipoleParticleData& particleI, const MultipoleParticleData& particleJ,
-                                    std::vector<Vec3>& forces, 
-                                    std::vector<Vec3>& torques,
-                                    std::vector<double>& dBorn) const;
-
-    /**
-     * Calculate Grycuk 'chain-rule' force.
-     * 
-     * @param particleI               particle parameters (charge, labFrame dipoles, quadrupoles, ...) for particle I
-     * @param particleJ               particle parameters (charge, labFrame dipoles, quadrupoles, ...) for particle J
-     * @param dBorn                   chain-rule Born force factor
-     * @param forces                  add Kirkwood force to forces
-     *
-     */
-    void calculateGrycukChainRulePairIxn(const MultipoleParticleData& particleI, const MultipoleParticleData& particleJ,
-                                         const std::vector<double>& dBorn, std::vector<Vec3>& forces) const;
-
-    /**
-     * Calculate TINKER's ACE approximation to non-polar cavity term. 
-     * 
-     * @param dBorn add ACE force to chain rule force
-     *
-     * @return ACE energy
-     *
-     */
-    double calculateCavityTermEnergyAndForces(std::vector<double>& dBorn) const;
-
-    /**
-     * Correct vacuum to SCRF derivatives (TINKER's ediff1()).
-     * 
-     * @param particleI               particle parameters (charge, labFrame dipoles, quadrupoles, ...) for particle I
-     * @param particleJ               particle parameters (charge, labFrame dipoles, quadrupoles, ...) for particle J
-     * @param pscale                  p-scale factor
-     * @param dscale                  d-scale factor
-     * @param forces                  force accumulator
-     * @param torques                 torque accumulator
-     *
-     * @return energy
-     */
-    double calculateKirkwoodEDiffPairIxn(const MultipoleParticleData& particleI, const MultipoleParticleData& particleJ,
-                                         double pscale, double dscale, 
-                                         std::vector<Vec3>& forces, std::vector<Vec3>& torques) const;
-
-};
 
 class MPIDReferencePmeForce : public MPIDReferenceForce {
 

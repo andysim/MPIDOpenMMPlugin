@@ -148,6 +148,7 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
         force.getCovalentMaps(ii, covalentLists);
         multipoleAtomCovalentInfo[ii] = covalentLists;
 
+        defaultTholeWidth = force.getDefaultTholeWidth();
     }
 
     polarizationType = force.getPolarizationType();
@@ -185,7 +186,6 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
 MPIDReferenceForce* ReferenceCalcMPIDForceKernel::setupMPIDReferenceForce(ContextImpl& context)
 {
 
-    // MPIDReferenceForce is set to MPIDReferenceGeneralizedKirkwoodForce if MPIDGeneralizedKirkwoodForce is present
     // MPIDReferenceForce is set to MPIDReferencePmeForce if 'usePme' is set
     // MPIDReferenceForce is set to MPIDReferenceForce otherwise
 
@@ -210,7 +210,7 @@ MPIDReferenceForce* ReferenceCalcMPIDForceKernel::setupMPIDReferenceForce(Contex
     }
 
     // set polarization type
-
+    mpidReferenceForce->setDefaultTholeWidth(defaultTholeWidth);
     if (polarizationType == MPIDForce::Mutual) {
         mpidReferenceForce->setPolarizationType(MPIDReferenceForce::Mutual);
         mpidReferenceForce->setMutualInducedDipoleTargetEpsilon(mutualInducedTargetEpsilon);

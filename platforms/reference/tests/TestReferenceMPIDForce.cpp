@@ -44,6 +44,7 @@
 #include "openmm/LangevinIntegrator.h"
 #include "openmm/Vec3.h"
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <stdlib.h>
 #include <stdio.h>
@@ -61,12 +62,9 @@ extern "C" OPENMM_EXPORT void registerMPIDReferenceKernelFactories();
 const double TOL = 1e-4;
 
 void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions,
-                   vector<pair<int, int> >& bonds, System &system) {
-    bool do_charge = true;
-    bool do_dpole  = true;
-    bool do_qpole  = true;
-    bool do_opole  = true;
-    bool do_pol    = true;
+                   vector<pair<int, int> >& bonds, System &system,
+                   bool do_charge = true, bool do_dpole = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
+{
     std::map < std::string, double > tholemap;
     std::map < std::string, double > polarmap;
     std::map < std::string, double > chargemap;
@@ -644,6 +642,254 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
     }
 }
 
+
+void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions,
+                      vector<pair<int, int> >& bonds, System &system,
+                      bool do_charge = true, bool do_dpole  = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
+{
+    std::map < std::string, double > tholemap;
+    std::map < std::string, double > polarmap;
+    std::map < std::string, double > chargemap;
+    std::map < std::string, std::vector<double> > dipolemap;
+    std::map < std::string, std::vector<double> > quadrupolemap;
+    std::map < std::string, std::vector<double> > octopolemap;
+    std::map < std::string, MPIDForce::MultipoleAxisTypes > axesmap;
+    std::map < std::string, std::vector<int> > anchormap;
+    std::map < std::string, double > massmap;
+    std::map < std::string, std::vector<int> > polgrpmap;
+    std::map < std::string, std::vector<int> > cov12map;
+    std::map < std::string, std::vector<int> > cov13map;
+
+    const char* atom_types[6] = {"C1", "O1", "HO1", "H1A", "H1B", "H1C"};
+    massmap["C1"]  = 12.01100;
+    massmap["O1"]  = 15.999;
+    massmap["HO1"] = 1.0080000;
+    massmap["H1A"] = 1.0080000;
+    massmap["H1B"] = 1.0080000;
+    massmap["H1C"] = 1.0080000;
+
+    axesmap["C1"]  = MPIDForce::ZOnly;
+    axesmap["O1"]  = MPIDForce::Bisector;
+    axesmap["H01"] = MPIDForce::ZOnly;
+    axesmap["H1A"] = MPIDForce::ZOnly;
+    axesmap["H1B"] = MPIDForce::ZOnly;
+    axesmap["H1C"] = MPIDForce::ZOnly;
+
+
+    chargemap["C1"]  = -0.140;
+    chargemap["O1"]  = -0.460;
+    chargemap["H01"] =  0.360;
+    chargemap["H1A"] =  0.080;
+    chargemap["H1B"] =  0.080;
+    chargemap["H1C"] =  0.080;
+    if(!do_charge){
+        chargemap["C1"]  =  0.0;
+        chargemap["O1"]  =  0.0;
+        chargemap["H01"] =  0.0;
+        chargemap["H1A"] =  0.0;
+        chargemap["H1B"] =  0.0;
+        chargemap["H1C"] =  0.0;
+    }
+
+    int c1anc[3] = { 1, 0, 0};
+    int o1anc[3] = {-1, 1, 0};
+    int ho1anc[3] = {-1, 0, 0};
+    int h1aanc[3] = {-3, 0, 0};
+    int h1banc[3] = {-4, 0, 0};
+    int h1canc[3] = {-5, 0, 0};
+    std::vector<int> c1ancv(&c1anc[0], &c1anc[3]);
+    std::vector<int> o1ancv(&o1anc[0], &o1anc[3]);
+    std::vector<int> ho1ancv(&ho1anc[0], &ho1anc[3]);
+    std::vector<int> h1aancv(&h1aanc[0], &h1aanc[3]);
+    std::vector<int> h1bancv(&h1banc[0], &h1banc[3]);
+    std::vector<int> h1cancv(&h1canc[0], &h1canc[3]);
+    anchormap["C1"]  = c1ancv;
+    anchormap["O1"]  = o1ancv;
+    anchormap["HO1"] = ho1ancv;
+    anchormap["H1A"] = h1aancv;
+    anchormap["H1B"] = h1bancv;
+    anchormap["H1C"] = h1cancv;
+
+    double od[3] = {
+            0.00026405942708641,                      0,    0.00550661803258754
+    };
+    double zerod[3] = {
+                              0,                      0,                      0
+    };
+    std::vector<double> odv(&od[0], &od[3]);
+    std::vector<double> zerodv(&zerod[0], &zerod[3]);
+    if(!do_dpole){
+        odv.assign(3, 0);
+    }
+    dipolemap["C1"]  = zerodv;
+    dipolemap["O1"]  = odv;
+    dipolemap["HO1"] = zerodv;
+    dipolemap["H1A"] = zerodv;
+    dipolemap["H1B"] = zerodv;
+    dipolemap["H1C"] = zerodv;
+
+    double oq[9] = {
+          9.383755641232907e-05,                     -0, -1.577493985246555e-06,
+                             -0, -0.0001547997648007625,                      0,
+         -1.577493985246555e-06,                      0,  6.096220838843343e-05
+    };
+    double zeroq[9] = {
+                              0,                      0,                      0,
+                              0,                      0,                      0,
+                              0,                      0,                      0
+    };
+
+    std::vector<double> oqv(&oq[0], &oq[9]);
+    std::vector<double> zeroqv(&zeroq[0], &zeroq[9]);
+    if(!do_qpole){
+        oqv.assign(9, 0);
+    }
+    quadrupolemap["C1"]  = zeroqv;
+    quadrupolemap["O1"]  = oqv;
+    quadrupolemap["HO1"] = zeroqv;
+    quadrupolemap["H1A"] = zeroqv;
+    quadrupolemap["H1B"] = zeroqv;
+    quadrupolemap["H1C"] = zeroqv;
+
+    double oo[27] = {
+        -3.230426667733178e-08,                      0, -2.245492298396793e-07,
+                             0,  3.684859776955582e-08,                      0,
+        -2.245492298396793e-07,                      0, -4.445541285871346e-09,
+                             0,  3.684859776955582e-08,                      0,
+         3.684859776955582e-08,                      0,  7.675967953604524e-07,
+                             0,  7.675967953604524e-07,                      0,
+        -2.245492298396793e-07,                      0, -4.445541285871346e-09,
+                             0,  7.675967953604524e-07,                      0,
+        -4.445541285871346e-09,                      0,  -5.43047565520773e-07
+    };
+    double zeroo[27] = {
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0,
+                             0,                      0,                      0
+    };
+    std::vector<double> oov(&oo[0], &oo[27]);
+    std::vector<double> zeroov(&zeroo[0], &zeroo[27]);
+    if(!do_opole){
+        oov.assign(27, 0);
+    }
+    octopolemap["C1"]  = zeroov;
+    octopolemap["O1"]  = oov;
+    octopolemap["HO1"] = zeroov;
+    octopolemap["H1A"] = zeroov;
+    octopolemap["H1B"] = zeroov;
+    octopolemap["H1C"] = zeroov;
+
+    polarmap["C1"]  = 1.0;
+    polarmap["O1"]  = 1.00024;
+    polarmap["HO1"] = 0.0;
+    polarmap["H1A"] = 0.0;
+    polarmap["H1B"] = 0.0;
+    polarmap["H1C"] = 0.0;
+
+    tholemap["C1"]  = 1.3;
+    tholemap["O1"]  = 1.3;
+    tholemap["HO1"] = 0.0;
+    tholemap["H1A"] = 0.0;
+    tholemap["H1B"] = 0.0;
+    tholemap["H1C"] = 0.0;
+
+    int cov12c1[4] = {1,3,4,5};
+    int cov12o1[2] = {-1,1};
+    int cov12h01[1] = {-1};
+    int cov12h1a[1] = {-3};
+    int cov12h1b[1] = {-4};
+    int cov12h1c[1] = {-5};
+    std::vector<int> cov12c1v(&cov12c1[0], &cov12c1[4]);
+    std::vector<int> cov12o1v(&cov12o1[0], &cov12o1[2]);
+    std::vector<int> cov12h01v(&cov12h01[0], &cov12h01[1]);
+    std::vector<int> cov12h1av(&cov12h1a[0], &cov12h1a[1]);
+    std::vector<int> cov12h1bv(&cov12h1b[0], &cov12h1b[1]);
+    std::vector<int> cov12h1cv(&cov12h1c[0], &cov12h1c[1]);
+    cov12map["C1"]  = cov12c1v;
+    cov12map["O1"]  = cov12o1v;
+    cov12map["HO1"] = cov12h01v;
+    cov12map["H1A"] = cov12h1av;
+    cov12map["H1B"] = cov12h1bv;
+    cov12map["H1C"] = cov12h1cv;
+
+    int cov13c1[1] = {2};
+    int cov13o1[3] = {2,3,4};
+    int cov13h01[1] = {-1};
+    int cov13h1a[3] = {-2,1,2};
+    int cov13h1b[3] = {-3,-1,1};
+    int cov13h1c[3] = {-4,-2,-1};
+    std::vector<int> cov13c1v(&cov13c1[0], &cov13c1[1]);
+    std::vector<int> cov13o1v(&cov13o1[0], &cov13o1[3]);
+    std::vector<int> cov13h01v(&cov13h01[0], &cov13h01[1]);
+    std::vector<int> cov13h1av(&cov13h1a[0], &cov13h1a[3]);
+    std::vector<int> cov13h1bv(&cov13h1b[0], &cov13h1b[3]);
+    std::vector<int> cov13h1cv(&cov13h1c[0], &cov13h1c[3]);
+    cov13map["C1"]  = cov13c1v;
+    cov13map["O1"]  = cov13o1v;
+    cov13map["HO1"] = cov13h01v;
+    cov13map["H1A"] = cov13h1av;
+    cov13map["H1B"] = cov13h1bv;
+    cov13map["H1C"] = cov13h1cv;
+    positions.clear();
+    if (natoms == 12) {
+        const double coords[12][3] = {
+            {  1.6118739816,  -7.7986654421,  -9.3388011053},
+            {  0.4344388195,  -8.6290855266,  -9.4591523136},
+            { -0.2932869802,  -8.1452383606,  -9.0381926002},
+            {  1.5101797393,  -6.7361319725,  -9.6470249020},
+            {  1.8800020341,  -7.7312323778,  -8.2627522535},
+            {  2.3828031354,  -8.2685172700,  -9.9862796759},
+            { -2.3016642008,  -3.3801483374,  -4.5239842701},
+            { -2.6774345292,  -3.8370280231,  -3.2318499504},
+            { -1.9568218092,  -3.4707595618,  -2.6956925837},
+            { -1.4748236015,  -3.9573461155,  -4.9903514535},
+            { -3.2561339708,  -3.3690912389,  -5.0924789477},
+            { -1.9925289806,  -2.3413378186,  -4.2797935219},
+        };
+        for (int atom = 0; atom < natoms; ++atom)
+            positions.push_back(Vec3(coords[atom][0], coords[atom][1], coords[atom][2])*OpenMM::NmPerAngstrom);
+    }
+    else
+        throw exception();
+
+    system.setDefaultPeriodicBoxVectors(Vec3(boxEdgeLength, 0, 0),
+                                        Vec3(0, boxEdgeLength, 0),
+                                        Vec3(0, 0, boxEdgeLength));
+
+    for(int atom = 0; atom < natoms; ++atom){
+        const char* element = atom_types[atom%6];
+        double damp = polarmap[element];
+        if(!do_pol) damp = 0.0;
+        double alpha = pow(damp, 1.0/6.0);
+        int atomz = atom + anchormap[element][0];
+        int atomx = atom + anchormap[element][1];
+        int atomy = anchormap[element][2]==0 ? -1 : atom + anchormap[element][2];
+        forceField->addMultipole(chargemap[element], dipolemap[element], quadrupolemap[element], octopolemap[element],
+                                 axesmap[element], atomz, atomx, atomy, tholemap[element], alpha, damp);
+        system.addParticle(massmap[element]);
+        // 1-2 covalent groups
+        std::vector<int> tmp12;
+        std::vector<int>& cov12s = cov12map[element];
+        for(int i=0; i < cov12s.size(); ++i)
+            tmp12.push_back(cov12s[i]+atom);
+        if(!tmp12.empty())
+           forceField->setCovalentMap(atom, MPIDForce::Covalent12, tmp12);
+        // 1-3 covalent groups
+        std::vector<int> tmp13;
+        std::vector<int>& cov13s = cov13map[element];
+        for(int i=0; i < cov13s.size(); ++i)
+            tmp13.push_back(cov13s[i]+atom);
+        if(!tmp13.empty())
+           forceField->setCovalentMap(atom, MPIDForce::Covalent13, tmp13);
+    }
+}
+
 static void check_finite_differences(vector<Vec3> analytic_forces, Context &context, vector<Vec3> positions)
 {
     // Take a small step in the direction of the energy gradient and see whether the potential energy changes by the expected amount.
@@ -668,7 +914,33 @@ static void check_finite_differences(vector<Vec3> analytic_forces, Context &cont
     ASSERT_EQUAL_TOL(norm, (state2.getPotentialEnergy()-state3.getPotentialEnergy())/stepSize, 1e-4);
 }
 
-void testWaterDimerEnergyAndForces() {
+
+#define FMT(x) std::setprecision(10) << std::setw(16) << (x)
+void print_energy_and_forces(double energy, const vector<Vec3>&forces)
+{
+    std::cout << "AKMA Units:" << std::endl;
+    std::cout << "Energy:" << energy*OpenMM::KcalPerKJ << std::endl;
+    size_t natoms = forces.size();
+    std::cout << "Forces:" << std::endl;
+    double sf = -OpenMM::KcalPerKJ/10.0;
+    for(int i = 0; i < natoms; ++i){
+        std::cout << i+1 << "\t" << FMT(forces[i][0]*sf) <<
+                                    FMT(forces[i][1]*sf) <<
+                                    FMT(forces[i][2]*sf) << std::endl;
+    }
+    std::cout << "SI Units:" << std::endl;
+    std::cout << "Energy:" << energy << std::endl;
+    std::cout << "Forces:" << std::endl;
+    for(int i = 0; i < natoms; ++i){
+        std::cout << i+1 << "\t" << FMT(forces[i][0]) <<
+                                    FMT(forces[i][1]) <<
+                                    FMT(forces[i][2]) << std::endl;
+    }
+}
+
+
+void testWaterDimerEnergyAndForcesPMEDirect() {
+    // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
     double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
     const double alpha = 3.0;
@@ -683,35 +955,137 @@ void testWaterDimerEnergyAndForces() {
 
     make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, bonds, system);
     forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
-    forceField->setPolarizationType(MPIDForce::Extrapolated);
     forceField->setPMEParameters(alpha, grid, grid, grid);
+    forceField->setDefaultTholeWidth(3.0);
     forceField->setCutoffDistance(cutoff);
+    forceField->setPolarizationType(MPIDForce::Direct);
     system.addForce(forceField);
 
     VerletIntegrator integrator(0.01);
     Context context(system, integrator, Platform::getPlatformByName("Reference"));
     context.setPositions(positions);
-    double refenergy =-2.298363777;
+
+    double refenergy =-2.523378825;
     vector<Vec3> refforces(6);
-    refforces[0] = Vec3(  -137.7203283, -183.9079957,  32.80100273);
-    refforces[1] = Vec3(   37.56519756, -4.813998574,  7.691308969);
-    refforces[2] = Vec3(   40.99501057,  119.8240071,  34.06469001);
-    refforces[3] = Vec3(  -117.5860009,  -101.736468, -32.73843882);
-    refforces[4] = Vec3(   129.5884295,  167.1137166, -18.58460594);
-    refforces[5] = Vec3(   47.15774644,  3.520730293, -23.23411526);
+    refforces[0] = Vec3(-138.9611404, -183.3230775,  31.06070101);
+    refforces[1] = Vec3( 36.78970561, -5.591213516,  7.602180549);
+    refforces[2] = Vec3( 41.46501578,  118.9721597,  34.16219028);
+    refforces[3] = Vec3(-116.5250148, -100.9504047, -32.82579982);
+    refforces[4] = Vec3( 126.6256956,  166.2005733, -17.03879571);
+    refforces[5] = Vec3( 50.60579164,  4.691956668, -22.96063198);
 
     State state = context.getState(State::Forces | State::Energy);
     double energy = state.getPotentialEnergy();
     const vector<Vec3>& forces = state.getForces();
-
+//    print_energy_and_forces(energy, forces);
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
-
-    // Just to be sure, check the finite difference gradients
-    check_finite_differences(forces, context, positions);
 }
 
+
+void testWaterDimerEnergyAndForcesPMEMutual() {
+    // Water box with isotropic induced dipoles
+    const double cutoff = 6.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
+    const double alpha = 3.0;
+    const int grid = 64;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+
+    vector<pair<int, int> > bonds;
+    System system;
+
+    const int numAtoms = 6;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, bonds, system,
+                  do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField->setPMEParameters(alpha, grid, grid, grid);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setCutoffDistance(cutoff);
+    forceField->setPolarizationType(MPIDForce::Mutual);
+    forceField->setMutualInducedTargetEpsilon(1e-8);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = -2.533142734;
+    vector<Vec3> refforces(6);
+    refforces[0] = Vec3(   -140.08344, -184.8546865,  30.90279662);
+    refforces[1] = Vec3(  37.11078834, -5.575277522,  7.692842629);
+    refforces[2] = Vec3(  41.55280404,  119.5070598,  34.31977469);
+    refforces[3] = Vec3( -117.0366224, -101.5540561, -33.10925409);
+    refforces[4] = Vec3(   127.797775,  167.7874079, -16.87501824);
+    refforces[5] = Vec3(  50.65874856,  4.689545791, -22.93129868);
+
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+}
+
+void testWaterDimerEnergyAndForcesPMEExtrapolated() {
+    // Water box with isotropic induced dipoles
+    const double cutoff = 6.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
+    const double alpha = 3.0;
+    const int grid = 64;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+
+    vector<pair<int, int> > bonds;
+    System system;
+
+    const int numAtoms = 6;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, bonds, system,
+                  do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField->setPMEParameters(alpha, grid, grid, grid);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setCutoffDistance(cutoff);
+    forceField->setPolarizationType(MPIDForce::Extrapolated);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = -2.527906088;
+    vector<Vec3> refforces(6);
+    refforces[0] = Vec3( -140.1600796, -184.9846056,  30.95649704);
+    refforces[1] = Vec3(  37.14909834, -5.561336522,  7.692173765);
+    refforces[2] = Vec3(  41.56829521,  119.5723689,   34.3211156);
+    refforces[3] = Vec3( -117.1035706, -101.6332437, -33.11656221);
+    refforces[4] = Vec3(  127.9122744,  167.9337436, -16.90732164);
+    refforces[5] = Vec3(  50.63403577,   4.67306655, -22.94605984);
+
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+}
 
 
 int main(int numberOfArguments, char* argv[]) {
@@ -720,7 +1094,9 @@ int main(int numberOfArguments, char* argv[]) {
         std::cout << "TestReferenceMPIDForce running test..." << std::endl;
         registerMPIDReferenceKernelFactories();
 
-        testWaterDimerEnergyAndForces();
+        testWaterDimerEnergyAndForcesPMEDirect();
+        testWaterDimerEnergyAndForcesPMEMutual();
+        testWaterDimerEnergyAndForcesPMEExtrapolated();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;

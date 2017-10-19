@@ -444,13 +444,24 @@ public:
     bool usesPeriodicBoundaryConditions() const {
         return nonbondedMethod == MPIDForce::PME;
     }
+
+    /**
+     * Set the default Thole width (in nm) used for "direct" pairs.
+     */
+    void setDefaultTholeWidth(double val);
+
+    /**
+     * Get the default Thole width (in nm) used for "direct" pairs.
+     */
+    double getDefaultTholeWidth() const;
+
 protected:
     ForceImpl* createImpl() const;
 private:
     NonbondedMethod nonbondedMethod;
     PolarizationType polarizationType;
     double cutoffDistance;
-    double alpha;
+    double alpha, defaultThole;
     int pmeBSplineOrder, nx, ny, nz;
     int mutualInducedMaxIterations;
     std::vector<double> extrapolationCoefficients;

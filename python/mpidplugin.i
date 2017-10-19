@@ -483,6 +483,16 @@ public:
     bool usesPeriodicBoundaryConditions() const {
         return nonbondedMethod == MPIDForce::PME;
     }
+
+    /**
+     * Set the default Thole width (in nm) used for "direct" pairs.
+     */
+    void setDefaultTholeWidth();
+
+    /**
+     * Get the default Thole width (in nm) used for "direct" pairs.
+     */
+    double getDefaultTholeWidth() const;
 };
 
 }
