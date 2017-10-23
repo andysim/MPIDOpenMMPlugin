@@ -39,6 +39,7 @@
 
 #include <sstream>
 #include <vector>
+#include <math.h>
 
 namespace OpenMM {
 
@@ -239,11 +240,10 @@ public:
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param thole                Thole parameter
-     * @param dampingFactor        dampingFactor parameter
-     * @param polarity             polarity parameter
+     * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     int addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
-                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, double dampingFactor, double polarity);
+                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
 
     /**
      * Get the multipole parameters for a particle.
@@ -258,11 +258,10 @@ public:
      * @param[out] multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param[out] multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param[out] thole                Thole parameter
-     * @param[out] dampingFactor        dampingFactor parameter
-     * @param[out] polarity             polarity parameter
+     * @param[out] alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double>& molecularOctopole,
-                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, double& dampingFactor, double& polarity) const;
+                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, Vec3& alphas) const;
 
     /**
      * Set the multipole parameters for a particle.
@@ -277,11 +276,10 @@ public:
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param thole                thole parameter
-     * @param dampingFactor        damping factor parameter
-     * @param polarity             polarity parameter
+     * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     void setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double> &molecularOctopole,
-                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, double dampingFactor, double polarity);
+                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
 
     /**
      * Set the CovalentMap for an atom
@@ -482,7 +480,8 @@ class MPIDForce::MultipoleInfo {
 public:
 
     int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-    double charge, thole, dampingFactor, polarity;
+    double charge, thole, dampingFactor;
+    Vec3 polarity;
 
     std::vector<double> molecularDipole;
     std::vector<double> molecularQuadrupole;
@@ -500,9 +499,9 @@ public:
     }
 
     MultipoleInfo(double charge, const std::vector<double>& inputMolecularDipole, const std::vector<double>& inputMolecularQuadrupole, const std::vector<double>& inputMolecularOctopole,
-                   int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, double dampingFactor, double polarity) :
+                   int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas) :
         axisType(axisType), multipoleAtomZ(multipoleAtomZ), multipoleAtomX(multipoleAtomX), multipoleAtomY(multipoleAtomY),
-        charge(charge), thole(thole), dampingFactor(dampingFactor), polarity(polarity) {
+        charge(charge), thole(thole), polarity(alphas) {
 
        covalentInfo.resize(CovalentEnd);
 
@@ -525,6 +524,8 @@ public:
        molecularOctopole.resize(27);
        for(int i = 0; i < 27; ++i)
            molecularOctopole[i] = inputMolecularOctopole[i];
+
+       dampingFactor = pow((alphas[0]+alphas[1]+alphas[2])/3.0, 1.0/6.0);
     }
 };
 

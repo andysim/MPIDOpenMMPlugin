@@ -275,11 +275,12 @@ void MPIDReferenceForce::loadParticleData(const vector<Vec3>& particlePositions,
                                                      const vector<double>& octopoles,
                                                      const vector<double>& tholes,
                                                      const vector<double>& dampingFactors,
-                                                     const vector<double>& polarity,
+                                                     const vector<Vec3>& polarity,
                                                      vector<MultipoleParticleData>& particleData) const
 {
 
     particleData.resize(_numParticles);
+
     for (unsigned int ii = 0; ii < _numParticles; ii++) {
 
         particleData[ii].particleIndex        = ii;
@@ -344,6 +345,7 @@ void MPIDReferenceForce::loadParticleData(const vector<Vec3>& particlePositions,
         particleData[ii].thole                = tholes[ii];
         particleData[ii].dampingFactor        = dampingFactors[ii];
         particleData[ii].polarity             = polarity[ii];
+        particleData[ii].isAnisotropic        = polarity[ii][0] != polarity[ii][1] || polarity[ii][0] != polarity[ii][2];
 
     }
 }
@@ -486,7 +488,6 @@ void MPIDReferenceForce::applyRotationMatrixToParticle(      MultipoleParticleDa
         }
     }
     particleI.dipole = labDipole;
-
     double mPole[3][3];
     double rPole[3][3] = { { 0.0, 0.0, 0.0 },
                            { 0.0, 0.0, 0.0 },
@@ -521,6 +522,33 @@ void MPIDReferenceForce::applyRotationMatrixToParticle(      MultipoleParticleDa
     particleI.quadrupole[QYY] = rPole[1][1];
     particleI.quadrupole[QYZ] = rPole[1][2];
     particleI.quadrupole[QZZ] = rPole[2][2];
+
+    // Rotate the polarizabilities
+    double bAlpha[3][3] = { { 0.0, 0.0, 0.0 },
+                            { 0.0, 0.0, 0.0 },
+                            { 0.0, 0.0, 0.0 } };
+    double lAlpha[3][3] = { { 0.0, 0.0, 0.0 },
+                            { 0.0, 0.0, 0.0 },
+                            { 0.0, 0.0, 0.0 } };
+    bAlpha[0][0] = particleI.polarity[0];
+    bAlpha[1][1] = particleI.polarity[1];
+    bAlpha[2][2] = particleI.polarity[2];
+
+    for (int ii = 0; ii < 3; ii++) {
+       for (int jj = ii; jj < 3; jj++) {
+          for (int kk = 0; kk < 3; kk++) {
+             for (int mm = 0; mm < 3; mm++) {
+                 lAlpha[ii][jj] += rotationMatrix[kk][ii]*rotationMatrix[mm][jj]*bAlpha[kk][mm];
+             }
+          }
+       }
+    }
+    particleI.labPolarization[QXX] = lAlpha[0][0];
+    particleI.labPolarization[QXY] = lAlpha[0][1];
+    particleI.labPolarization[QXZ] = lAlpha[0][2];
+    particleI.labPolarization[QYY] = lAlpha[1][1];
+    particleI.labPolarization[QYZ] = lAlpha[1][2];
+    particleI.labPolarization[QZZ] = lAlpha[2][2];
 
 
     double laboPole[3][3][3] = {{{ 0.0, 0.0, 0.0 },
@@ -1032,8 +1060,12 @@ double MPIDReferenceForce::updateInducedDipole(const vector<MultipoleParticleDat
 
     double epsilon = 0.0;
     for (unsigned int ii = 0; ii < particleData.size(); ii++) {
+        Vec3 vx = Vec3(particleData[ii].labPolarization[QXX], particleData[ii].labPolarization[QXY], particleData[ii].labPolarization[QXZ]);
+        Vec3 vy = Vec3(particleData[ii].labPolarization[QXY], particleData[ii].labPolarization[QYY], particleData[ii].labPolarization[QYZ]);
+        Vec3 vz = Vec3(particleData[ii].labPolarization[QXZ], particleData[ii].labPolarization[QYZ], particleData[ii].labPolarization[QZZ]);
         Vec3 oldValue               = inducedDipole[ii];
-        Vec3 newValue               = fixedMultipoleField[ii] + inducedDipoleField[ii]*particleData[ii].polarity;
+        Vec3 newValue               = fixedMultipoleField[ii]
+                                    + Vec3(vx.dot(inducedDipoleField[ii]), vy.dot(inducedDipoleField[ii]), vz.dot(inducedDipoleField[ii]));
         Vec3 delta                  = newValue - oldValue;
         inducedDipole[ii]           = oldValue + delta*_polarSOR;
         epsilon                    += delta.dot(delta);
@@ -1098,9 +1130,18 @@ void MPIDReferenceForce::convergeInduceDipolesByExtrapolation(const vector<Multi
             UpdateInducedDipoleFieldStruct& field = updateInducedDipoleField[i];
             (*field.extrapolatedDipoles)[order].resize(_numParticles);
             for (int atom = 0; atom < _numParticles; ++atom) {
-                (*field.inducedDipoles)[atom] = field.inducedDipoleField[atom] * particleData[atom].polarity;
+                Vec3 vx = Vec3(particleData[atom].labPolarization[QXX], particleData[atom].labPolarization[QXY], particleData[atom].labPolarization[QXZ]);
+                Vec3 vy = Vec3(particleData[atom].labPolarization[QXY], particleData[atom].labPolarization[QYY], particleData[atom].labPolarization[QYZ]);
+                Vec3 vz = Vec3(particleData[atom].labPolarization[QXZ], particleData[atom].labPolarization[QYZ], particleData[atom].labPolarization[QZZ]);
+                Vec3 inddip(vx.dot(field.inducedDipoleField[atom]), vy.dot(field.inducedDipoleField[atom]), vz.dot(field.inducedDipoleField[atom]));
+                (*field.inducedDipoles)[atom] = inddip;
                 (*field.extrapolatedDipoles)[order][atom] = (*field.inducedDipoles)[atom];
             }
+            vector<double> dipfield(3*_numParticles, 0.0);
+            for (int atom = 0; atom < _numParticles; ++atom)
+                for (int component = 0; component < 3; ++component)
+                    dipfield[3*atom + component] = field.inducedDipoleField[atom][component];
+            field.extrapolatedDipoleField->push_back(dipfield);
             vector<double> fieldGrad(6*_numParticles, 0.0);
             for (int atom = 0; atom < _numParticles; ++atom)
                 for (int component = 0; component < 6; ++component)
@@ -1145,7 +1186,11 @@ void MPIDReferenceForce::convergeInduceDipolesByDIIS(const vector<MultipoleParti
             double epsilon = 0;
             for (int i = 0; i < _numParticles; i++) {
                 prevDipoles[k].back()[i] = (*field.inducedDipoles)[i];
-                Vec3 newDipole = (*field.fixedMultipoleField)[i] + field.inducedDipoleField[i]*particleData[i].polarity;
+                Vec3 vx = Vec3(particleData[i].labPolarization[QXX], particleData[i].labPolarization[QXY], particleData[i].labPolarization[QXZ]);
+                Vec3 vy = Vec3(particleData[i].labPolarization[QXY], particleData[i].labPolarization[QYY], particleData[i].labPolarization[QYZ]);
+                Vec3 vz = Vec3(particleData[i].labPolarization[QXZ], particleData[i].labPolarization[QYZ], particleData[i].labPolarization[QZZ]);
+                Vec3 newDipole = (*field.fixedMultipoleField)[i] +
+                                Vec3(vx.dot(field.inducedDipoleField[i]), vy.dot(field.inducedDipoleField[i]), vz.dot(field.inducedDipoleField[i]));
                 Vec3 error = newDipole-(*field.inducedDipoles)[i];
                 prevDipoles[k].back()[i] = newDipole;
                 if (k == 0)
@@ -1242,15 +1287,18 @@ void MPIDReferenceForce::calculateInducedDipoles(const vector<MultipoleParticleD
     // converge induced dipoles.
 
     for (unsigned int ii = 0; ii < _numParticles; ii++) {
-        _fixedMultipoleField[ii]      *= particleData[ii].polarity;
-        _fixedMultipoleFieldPolar[ii] *= particleData[ii].polarity;
+        Vec3 vx = Vec3(particleData[ii].labPolarization[QXX], particleData[ii].labPolarization[QXY], particleData[ii].labPolarization[QXZ]);
+        Vec3 vy = Vec3(particleData[ii].labPolarization[QXY], particleData[ii].labPolarization[QYY], particleData[ii].labPolarization[QYZ]);
+        Vec3 vz = Vec3(particleData[ii].labPolarization[QXZ], particleData[ii].labPolarization[QYZ], particleData[ii].labPolarization[QZZ]);
+        _fixedMultipoleField[ii]  =  Vec3(vx.dot(_fixedMultipoleField[ii]), vy.dot(_fixedMultipoleField[ii]), vz.dot(_fixedMultipoleField[ii]));
+        _fixedMultipoleFieldPolar[ii]  =  Vec3(vx.dot(_fixedMultipoleFieldPolar[ii]), vy.dot(_fixedMultipoleFieldPolar[ii]), vz.dot(_fixedMultipoleFieldPolar[ii]));
     }
 
     _inducedDipole.resize(_numParticles);
     _inducedDipolePolar.resize(_numParticles);
     vector<UpdateInducedDipoleFieldStruct> updateInducedDipoleField;
-    updateInducedDipoleField.push_back(UpdateInducedDipoleFieldStruct(_fixedMultipoleField, _inducedDipole, _ptDipoleD, _ptDipoleFieldGradientD));
-    updateInducedDipoleField.push_back(UpdateInducedDipoleFieldStruct(_fixedMultipoleFieldPolar, _inducedDipolePolar, _ptDipoleP, _ptDipoleFieldGradientP));
+    updateInducedDipoleField.push_back(UpdateInducedDipoleFieldStruct(_fixedMultipoleField, _inducedDipole, _ptDipoleD, _ptDipoleFieldD, _ptDipoleFieldGradientD));
+    updateInducedDipoleField.push_back(UpdateInducedDipoleFieldStruct(_fixedMultipoleFieldPolar, _inducedDipolePolar, _ptDipoleP, _ptDipoleFieldP, _ptDipoleFieldGradientP));
 
     initializeInducedDipoles(updateInducedDipoleField);
 
@@ -1965,7 +2013,7 @@ void MPIDReferenceForce::setup(const vector<Vec3>& particlePositions,
                                           const vector<double>& octopoles,
                                           const vector<double>& tholes,
                                           const vector<double>& dampingFactors,
-                                          const vector<double>& polarity,
+                                          const vector<Vec3>& polarity,
                                           const vector<int>& axisTypes,
                                           const vector<int>& multipoleAtomZs,
                                           const vector<int>& multipoleAtomXs,
@@ -2010,7 +2058,7 @@ double MPIDReferenceForce::calculateForceAndEnergy(const vector<Vec3>& particleP
                                                              const vector<double>& octopoles,
                                                              const vector<double>& tholes,
                                                              const vector<double>& dampingFactors,
-                                                             const vector<double>& polarity,
+                                                             const vector<Vec3>& polarity,
                                                              const vector<int>& axisTypes,
                                                              const vector<int>& multipoleAtomZs,
                                                              const vector<int>& multipoleAtomXs,
@@ -2044,7 +2092,7 @@ void MPIDReferenceForce::calculateInducedDipoles(const vector<Vec3>& particlePos
                                                             const vector<double>& octopoles,
                                                             const vector<double>& tholes,
                                                             const vector<double>& dampingFactors,
-                                                            const vector<double>& polarity,
+                                                            const std::vector<Vec3> &polarity,
                                                             const vector<int>& axisTypes,
                                                             const vector<int>& multipoleAtomZs,
                                                             const vector<int>& multipoleAtomXs,
@@ -2070,7 +2118,7 @@ void MPIDReferenceForce::calculateLabFramePermanentDipoles(const vector<Vec3>& p
                                                                       const vector<double>& octopoles,
                                                                       const vector<double>& tholes,
                                                                       const vector<double>& dampingFactors,
-                                                                      const vector<double>& polarity,
+                                                                      const vector<Vec3>& polarity,
                                                                       const vector<int>& axisTypes,
                                                                       const vector<int>& multipoleAtomZs,
                                                                       const vector<int>& multipoleAtomXs,
@@ -2095,7 +2143,7 @@ void MPIDReferenceForce::calculateTotalDipoles(const vector<Vec3>& particlePosit
                                                           const vector<double>& octopoles,
                                                           const vector<double>& tholes,
                                                           const vector<double>& dampingFactors,
-                                                          const vector<double>& polarity,
+                                                          const vector<Vec3>& polarity,
                                                           const vector<int>& axisTypes,
                                                           const vector<int>& multipoleAtomZs,
                                                           const vector<int>& multipoleAtomXs,
@@ -2122,7 +2170,7 @@ void MPIDReferenceForce::calculateMPIDSystemMultipoleMoments(const vector<double
                                                                           const vector<double>& octopoles,
                                                                           const vector<double>& tholes,
                                                                           const vector<double>& dampingFactors,
-                                                                          const vector<double>& polarity,
+                                                                          const std::vector<Vec3> &polarity,
                                                                           const vector<int>& axisTypes,
                                                                           const vector<int>& multipoleAtomZs,
                                                                           const vector<int>& multipoleAtomXs,
@@ -2263,7 +2311,7 @@ void MPIDReferenceForce::calculateElectrostaticPotential(const vector<Vec3>& par
                                                                     const vector<double>& octopoles,
                                                                     const vector<double>& tholes,
                                                                     const vector<double>& dampingFactors,
-                                                                    const vector<double>& polarity,
+                                                                    const std::vector<Vec3> &polarity,
                                                                     const vector<int>& axisTypes,
                                                                     const vector<int>& multipoleAtomZs,
                                                                     const vector<int>& multipoleAtomXs,
@@ -2298,8 +2346,8 @@ void MPIDReferenceForce::calculateElectrostaticPotential(const vector<Vec3>& par
         p *= term;
 }
 
-MPIDReferenceForce::UpdateInducedDipoleFieldStruct::UpdateInducedDipoleFieldStruct(vector<OpenMM::Vec3>& inputFixed_E_Field, vector<OpenMM::Vec3>& inputInducedDipoles, vector<vector<Vec3> >& extrapolatedDipoles, vector<vector<double> >& extrapolatedDipoleFieldGradient) :
-        fixedMultipoleField(&inputFixed_E_Field), inducedDipoles(&inputInducedDipoles), extrapolatedDipoles(&extrapolatedDipoles), extrapolatedDipoleFieldGradient(&extrapolatedDipoleFieldGradient) { 
+MPIDReferenceForce::UpdateInducedDipoleFieldStruct::UpdateInducedDipoleFieldStruct(vector<OpenMM::Vec3>& inputFixed_E_Field, vector<OpenMM::Vec3>& inputInducedDipoles, vector<vector<Vec3> >& extrapolatedDipoles,  vector<vector<double> >& extrapolatedDipoleField,  vector<vector<double> >& extrapolatedDipoleFieldGradient) :
+        fixedMultipoleField(&inputFixed_E_Field), inducedDipoles(&inputInducedDipoles), extrapolatedDipoles(&extrapolatedDipoles), extrapolatedDipoleField(&extrapolatedDipoleField),  extrapolatedDipoleFieldGradient(&extrapolatedDipoleFieldGradient) {
     inducedDipoleField.resize(fixedMultipoleField->size());
 }
 
@@ -3646,11 +3694,15 @@ double MPIDReferencePmeForce::computeReciprocalSpaceFixedMultipoleForceAndEnergy
         multipole[1] =  particleData[i].dipole[0];
         multipole[2] =  particleData[i].dipole[1];
         multipole[3] =  particleData[i].dipole[2];
+        if(particleData[i].isAnisotropic){
+            multipole[1] += _inducedDipole[i][0];
+            multipole[2] += _inducedDipole[i][1];
+            multipole[3] += _inducedDipole[i][2];
+        }
 
         multipole[4] = particleData[i].quadrupole[QXX];
         multipole[5] = particleData[i].quadrupole[QYY];
         multipole[6] = particleData[i].quadrupole[QZZ];
-
         multipole[7] = particleData[i].quadrupole[QXY]*2.0;
         multipole[8] = particleData[i].quadrupole[QXZ]*2.0;
         multipole[9] = particleData[i].quadrupole[QYZ]*2.0;
@@ -3779,7 +3831,11 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
         multipole[1] = particleData[i].dipole[0];
         multipole[2] = particleData[i].dipole[1];
         multipole[3] = particleData[i].dipole[2];
-
+        if (polarizationType == MPIDReferenceForce::Mutual && particleData[i].isAnisotropic){
+            multipole[1] += 0.5*_inducedDipole[i][0];
+            multipole[2] += 0.5*_inducedDipole[i][1];
+            multipole[3] += 0.5*_inducedDipole[i][2];
+        }
         multipole[4] = particleData[i].quadrupole[QXX];
         multipole[5] = particleData[i].quadrupole[QYY];
         multipole[6] = particleData[i].quadrupole[QZZ];
@@ -4237,6 +4293,7 @@ void MPIDReferencePmeForce::calculatePmeSelfTorque(const vector<MultipoleParticl
     for (unsigned int ii = 0; ii < _numParticles; ii++) {
 
         const MultipoleParticleData& particleI = particleData[ii];
+        if(particleI.isAnisotropic) continue;
         Vec3 ui = (_inducedDipole[ii] + _inducedDipolePolar[ii]);
         Vec3 dipole(particleI.sphericalDipole[1], particleI.sphericalDipole[2], particleI.sphericalDipole[0]);
         Vec3 torque = dipole.cross(ui)*term;
@@ -4299,7 +4356,6 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     inducedDipoleRotationMatrix[2][0] = 0.5*qiRotationMatrix1[2][1];
     inducedDipoleRotationMatrix[2][1] = 0.5*qiRotationMatrix1[2][2];
     inducedDipoleRotationMatrix[2][2] = 0.5*qiRotationMatrix1[2][0];
-
     // Rotate the induced dipoles to the QI frame.
     double qiUindI[3], qiUindJ[3], qiUinpI[3], qiUinpJ[3];
     for (int ii = 0; ii < 3; ii++) {
@@ -4804,6 +4860,10 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     //    qiUindIy[0] = -qiQUindI[1];   qiUindIy[1] = qiQUindI[0];    qiUindIy[2] = 0
     double iEIY = qiUinpI[0]*Vijp[1] + qiUindI[0]*Vijd[1] - qiUinpI[1]*Vijp[0] - qiUindI[1]*Vijd[0];
     double iEJY = qiUinpJ[0]*Vjip[1] + qiUindJ[0]*Vjid[1] - qiUinpJ[1]*Vjip[0] - qiUindJ[1]*Vjid[0];
+    // The torque about the z axis (needed to obtain the x force on the induced dipoles, below)
+    //    qiUindIz[0] = 0;  qiUindIz[1] = -qiQUindI[2];    qiUindIz[2] = qiQUindI[1]
+    double iEIZ = qiUinpI[1]*Vijp[2] + qiUindI[1]*Vijd[2] - qiUinpI[2]*Vijp[1] - qiUindI[2]*Vijd[1];
+    double iEJZ = qiUinpJ[1]*Vjip[2] + qiUindJ[1]*Vjid[2] - qiUinpJ[2]*Vjip[1] - qiUindJ[2]*Vjid[1];
 
     // Add in the induced-induced terms, if needed.
     if(getPolarizationType() == MPIDReferenceForce::Mutual) {
@@ -4823,6 +4883,8 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
         iEJX -= eCoef*(qiUinpJ[0]*qiUindI[2] + qiUindJ[0]*qiUinpI[2]);
         iEIY += eCoef*(qiUinpI[0]*qiUindJ[1] + qiUindI[0]*qiUinpJ[1]);
         iEJY += eCoef*(qiUinpJ[0]*qiUindI[1] + qiUindJ[0]*qiUinpI[1]);
+        iEIZ += eCoef*(qiUinpI[1]*qiUindJ[2] + qiUindI[1]*qiUinpJ[2] - qiUinpI[2]*qiUindJ[1] + qiUindI[2]*qiUinpJ[1]);
+        iEJZ += eCoef*(qiUinpJ[1]*qiUindI[2] + qiUindJ[1]*qiUinpI[2] - qiUinpJ[2]*qiUindI[1] + qiUindJ[2]*qiUinpI[1]);
         fIZ += dCoef*(qiUinpI[1]*qiUindJ[1] + qiUindI[1]*qiUinpJ[1] + qiUinpI[2]*qiUindJ[2] + qiUindI[2]*qiUinpJ[2]);
         fJZ += dCoef*(qiUinpJ[1]*qiUindI[1] + qiUindJ[1]*qiUinpI[1] + qiUinpJ[2]*qiUindI[2] + qiUindJ[2]*qiUinpI[2]);
     }
@@ -4832,8 +4894,19 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     double qiForce[3] = {rInv*(EIY+EJY+iEIY+iEJY), -rInv*(EIX+EJX+iEIX+iEJX), -(fJZ+fIZ)};
     double qiTorqueI[3] = {-EIX, -EIY, -EIZ};
     double qiTorqueJ[3] = {-EJX, -EJY, -EJZ};
+    if(particleI.isAnisotropic){
+        qiTorqueI[0] += -iEIX;
+        qiTorqueI[1] += -iEIY;
+        qiTorqueI[2] += -iEIZ;
+    }
+    if(particleJ.isAnisotropic){
+        qiTorqueJ[0] += -iEJX;
+        qiTorqueJ[1] += -iEJY;
+        qiTorqueJ[2] += -iEJZ;
+    }
 
     // Rotate the forces and torques back to the lab frame
+    Vec3 tmpf, tmpi, tmpj;
     for (int ii = 0; ii < 3; ii++) {
         double forceVal = 0.0;
         double torqueIVal = 0.0;
@@ -4843,6 +4916,9 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
             torqueIVal += forceRotationMatrix[ii][jj] * qiTorqueI[jj];
             torqueJVal += forceRotationMatrix[ii][jj] * qiTorqueJ[jj];
         }
+        tmpi[ii] = torqueIVal;
+        tmpj[ii] = torqueJVal;
+        tmpf[ii] = forceVal;
         torques[iIndex][ii] += torqueIVal;
         torques[jIndex][ii] += torqueJVal;
         forces[iIndex][ii]  -= forceVal;
@@ -4912,6 +4988,20 @@ double MPIDReferencePmeForce::calculateElectrostatic(const vector<MultipoleParti
                     forces[i][2] += 0.5*p*prefac*(_ptDipoleP[l][i][0]*_ptDipoleFieldGradientD[m][6*i+4]
                                                 + _ptDipoleP[l][i][1]*_ptDipoleFieldGradientD[m][6*i+5]
                                                 + _ptDipoleP[l][i][2]*_ptDipoleFieldGradientD[m][6*i+2]);
+                    if(particleData[i].isAnisotropic){
+                        torques[i][0] += 0.5*p*prefac*(_ptDipoleD[l][i][1]*_ptDipoleFieldP[m][3*i+2]
+                                                     - _ptDipoleD[l][i][2]*_ptDipoleFieldP[m][3*i+1]);
+                        torques[i][1] += 0.5*p*prefac*(_ptDipoleD[l][i][2]*_ptDipoleFieldP[m][3*i+0]
+                                                     - _ptDipoleD[l][i][0]*_ptDipoleFieldP[m][3*i+2]);
+                        torques[i][2] += 0.5*p*prefac*(_ptDipoleD[l][i][0]*_ptDipoleFieldP[m][3*i+1]
+                                                     - _ptDipoleD[l][i][1]*_ptDipoleFieldP[m][3*i+0]);
+                        torques[i][0] += 0.5*p*prefac*(_ptDipoleP[l][i][1]*_ptDipoleFieldD[m][3*i+2]
+                                                     - _ptDipoleP[l][i][2]*_ptDipoleFieldD[m][3*i+1]);
+                        torques[i][1] += 0.5*p*prefac*(_ptDipoleP[l][i][2]*_ptDipoleFieldD[m][3*i+0]
+                                                     - _ptDipoleP[l][i][0]*_ptDipoleFieldD[m][3*i+2]);
+                        torques[i][2] += 0.5*p*prefac*(_ptDipoleP[l][i][0]*_ptDipoleFieldD[m][3*i+1]
+                                                     - _ptDipoleP[l][i][1]*_ptDipoleFieldD[m][3*i+0]);
+                    }
                 }
             }
         }

@@ -107,12 +107,13 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
         // multipoles
 
         int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-        double charge, tholeD, dampingFactorD, polarityD;
+        double charge, tholeD;
+        Vec3 alphasD;
         std::vector<double> dipolesD;
         std::vector<double> quadrupolesD;
         std::vector<double> octopolesD;
         force.getMultipoleParameters(ii, charge, dipolesD, quadrupolesD, octopolesD, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY,
-                                     tholeD, dampingFactorD, polarityD);
+                                     tholeD, alphasD);
 
         totalCharge                       += charge;
         axisTypes[ii]                      = axisType;
@@ -122,8 +123,8 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
 
         charges[ii]                        = charge;
         tholes[ii]                         = tholeD;
-        dampingFactors[ii]                 = dampingFactorD;
-        polarity[ii]                       = polarityD;
+        dampingFactors[ii]                 = pow((alphasD[0]+alphasD[1]+alphasD[2])/3.0, 1.0/6.0);
+        polarity[ii]                       = alphasD;
 
         dipoles[dipoleIndex++]             = dipolesD[0];
         dipoles[dipoleIndex++]             = dipolesD[1];
@@ -359,11 +360,13 @@ void ReferenceCalcMPIDForceKernel::copyParametersToContext(ContextImpl& context,
     int octopoleIndex = 0;
     for (int i = 0; i < numMultipoles; ++i) {
         int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-        double charge, tholeD, dampingFactorD, polarityD;
+        double charge, tholeD, dampingFactorD;
         std::vector<double> dipolesD;
         std::vector<double> quadrupolesD;
         std::vector<double> octopolesD;
-        force.getMultipoleParameters(i, charge, dipolesD, quadrupolesD, octopolesD, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, tholeD, dampingFactorD, polarityD);
+        Vec3 polarityD;
+        force.getMultipoleParameters(i, charge, dipolesD, quadrupolesD, octopolesD, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, tholeD, polarityD);
+        dampingFactorD = pow((polarityD[0]+polarityD[1]+polarityD[2])/3.0, 1.0/6.0);
         axisTypes[i] = axisType;
         multipoleAtomZs[i] = multipoleAtomZ;
         multipoleAtomXs[i] = multipoleAtomX;

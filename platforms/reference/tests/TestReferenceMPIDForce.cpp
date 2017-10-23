@@ -61,12 +61,11 @@ extern "C" OPENMM_EXPORT void registerMPIDReferenceKernelFactories();
 
 const double TOL = 1e-4;
 
-void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions,
-                   vector<pair<int, int> >& bonds, System &system,
+void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions, System &system,
                    bool do_charge = true, bool do_dpole = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
 {
     std::map < std::string, double > tholemap;
-    std::map < std::string, double > polarmap;
+    std::map < std::string, Vec3 > polarmap;
     std::map < std::string, double > chargemap;
     std::map < std::string, std::vector<double> > dipolemap;
     std::map < std::string, std::vector<double> > quadrupolemap;
@@ -162,13 +161,9 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
     octopolemap["H1"] = hov;
     octopolemap["H2"] = hov;
 
-    polarmap["O"]  = 0.3069876538;
-    polarmap["H1"] = 0.2813500172;
-    polarmap["H2"] = 0.2813500172;
-
-    polarmap["O"]  = 0.000837;
-    polarmap["H1"] = 0.000496;
-    polarmap["H2"] = 0.000496;
+    polarmap["O"]  = Vec3(0.000837, 0.000837, 0.000837);
+    polarmap["H1"] = Vec3(0.000496, 0.000496, 0.000496);
+    polarmap["H2"] = Vec3(0.000496, 0.000496, 0.000496);
 
     tholemap["O"]  = 0.3900;
     tholemap["H1"] = 0.3900;
@@ -609,14 +604,13 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
     const char* atom_types[3] = {"O", "H1", "H2"};
     for(int atom = 0; atom < natoms; ++atom){
         const char* element = atom_types[atom%3];
-        double damp = polarmap[element];
-        if(!do_pol) damp = 0.0;
-        double alpha = pow(damp, 1.0/6.0);
+        Vec3 alpha = polarmap[element];
+        if(!do_pol) alpha = Vec3();
         int atomz = atom + anchormap[element][0];
         int atomx = atom + anchormap[element][1];
         int atomy = anchormap[element][2]==0 ? -1 : atom + anchormap[element][2];
         forceField->addMultipole(chargemap[element], dipolemap[element], quadrupolemap[element], octopolemap[element],
-                                 axesmap[element], atomz, atomx, atomy, tholemap[element], alpha, damp);
+                                 axesmap[element], atomz, atomx, atomy, tholemap[element], alpha);
         system.addParticle(massmap[element]);
         // Polarization groups
         std::vector<int> tmppol;
@@ -643,12 +637,11 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
 }
 
 
-void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions,
-                      vector<pair<int, int> >& bonds, System &system,
+void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions, System &system,
                       bool do_charge = true, bool do_dpole  = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
 {
     std::map < std::string, double > tholemap;
-    std::map < std::string, double > polarmap;
+    std::map < std::string, Vec3 > polarmap;
     std::map < std::string, double > chargemap;
     std::map < std::string, std::vector<double> > dipolemap;
     std::map < std::string, std::vector<double> > quadrupolemap;
@@ -656,7 +649,6 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     std::map < std::string, MPIDForce::MultipoleAxisTypes > axesmap;
     std::map < std::string, std::vector<int> > anchormap;
     std::map < std::string, double > massmap;
-    std::map < std::string, std::vector<int> > polgrpmap;
     std::map < std::string, std::vector<int> > cov12map;
     std::map < std::string, std::vector<int> > cov13map;
 
@@ -669,8 +661,8 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     massmap["H1C"] = 1.0080000;
 
     axesmap["C1"]  = MPIDForce::ZOnly;
-    axesmap["O1"]  = MPIDForce::Bisector;
-    axesmap["H01"] = MPIDForce::ZOnly;
+    axesmap["O1"]  = MPIDForce::ZThenX;
+    axesmap["HO1"] = MPIDForce::ZOnly;
     axesmap["H1A"] = MPIDForce::ZOnly;
     axesmap["H1B"] = MPIDForce::ZOnly;
     axesmap["H1C"] = MPIDForce::ZOnly;
@@ -678,14 +670,14 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
 
     chargemap["C1"]  = -0.140;
     chargemap["O1"]  = -0.460;
-    chargemap["H01"] =  0.360;
+    chargemap["HO1"] =  0.360;
     chargemap["H1A"] =  0.080;
     chargemap["H1B"] =  0.080;
     chargemap["H1C"] =  0.080;
     if(!do_charge){
         chargemap["C1"]  =  0.0;
         chargemap["O1"]  =  0.0;
-        chargemap["H01"] =  0.0;
+        chargemap["HO1"] =  0.0;
         chargemap["H1A"] =  0.0;
         chargemap["H1B"] =  0.0;
         chargemap["H1C"] =  0.0;
@@ -785,12 +777,15 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     octopolemap["H1B"] = zeroov;
     octopolemap["H1C"] = zeroov;
 
-    polarmap["C1"]  = 1.0;
-    polarmap["O1"]  = 1.00024;
-    polarmap["HO1"] = 0.0;
-    polarmap["H1A"] = 0.0;
-    polarmap["H1B"] = 0.0;
-    polarmap["H1C"] = 0.0;
+    Vec3 c1pol(0.00100000, 0.00100000, 0.00100000);
+    Vec3 o1pol(0.00100024, 0.00125025, 0.00083350);
+    Vec3 zeropol(0.0, 0.0, 0.0);
+    polarmap["C1"]  = c1pol;
+    polarmap["O1"]  = o1pol;
+    polarmap["HO1"] = zeropol;
+    polarmap["H1A"] = zeropol;
+    polarmap["H1B"] = zeropol;
+    polarmap["H1C"] = zeropol;
 
     tholemap["C1"]  = 1.3;
     tholemap["O1"]  = 1.3;
@@ -864,14 +859,13 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
 
     for(int atom = 0; atom < natoms; ++atom){
         const char* element = atom_types[atom%6];
-        double damp = polarmap[element];
-        if(!do_pol) damp = 0.0;
-        double alpha = pow(damp, 1.0/6.0);
+        Vec3 alphas = polarmap[element];
+        if(!do_pol) alphas = Vec3();
         int atomz = atom + anchormap[element][0];
-        int atomx = atom + anchormap[element][1];
+        int atomx = anchormap[element][1]==0 ? -1 : atom + anchormap[element][1];
         int atomy = anchormap[element][2]==0 ? -1 : atom + anchormap[element][2];
         forceField->addMultipole(chargemap[element], dipolemap[element], quadrupolemap[element], octopolemap[element],
-                                 axesmap[element], atomz, atomx, atomy, tholemap[element], alpha, damp);
+                                 axesmap[element], atomz, atomx, atomy, tholemap[element], alphas);
         system.addParticle(massmap[element]);
         // 1-2 covalent groups
         std::vector<int> tmp12;
@@ -939,6 +933,172 @@ void print_energy_and_forces(double energy, const vector<Vec3>&forces)
 }
 
 
+void testMethanolDimerEnergyAndForcesPMEDirect() {
+    // Methanol box with anisotropic induced dipoles
+    const double cutoff = 12.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 24.61817*OpenMM::NmPerAngstrom;
+    const double alpha = 4.5;
+    const int grid = 64;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 12;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_methanolbox(numAtoms, boxEdgeLength, forceField,  positions,  system,
+                     do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField->setPMEParameters(alpha, grid, grid, grid);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setCutoffDistance(cutoff);
+    forceField->setPolarizationType(MPIDForce::Direct);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = 100.0504965;
+    vector<Vec3> refforces(12);
+    refforces[ 0] = Vec3(  0.440761737, 0.9533499435,  0.266229038);
+    refforces[ 1] = Vec3(  2.778053201,  1.840901797, -1.333672426);
+    refforces[ 2] = Vec3( -171.6385415, -55.43623918,  12.32115976);
+    refforces[ 3] = Vec3(  54.16070948,  41.79094334, -18.66358364);
+    refforces[ 4] = Vec3(  67.20643782,  12.09812277,  23.99067218);
+    refforces[ 5] = Vec3(   46.5256724, -2.469159228, -16.59389151);
+    refforces[ 6] = Vec3( 0.9792527378, -1.511526836, -2.188354526);
+    refforces[ 7] = Vec3(  2.487179031, -3.695580575, -6.600564473);
+    refforces[ 8] = Vec3(  12.53150326, -46.68184079,  204.8209671);
+    refforces[ 9] = Vec3(  13.32662174, -12.47177821,  -64.7663427);
+    refforces[10] = Vec3( -26.51229626,  3.163194311, -46.15977428);
+    refforces[11] = Vec3( -2.284316042,  62.42112734, -85.09532806);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+}
+
+
+void testMethanolDimerEnergyAndForcesPMEMutual() {
+    // Methanol box with anisotropic induced dipoles
+    const double cutoff = 12.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 24.61817*OpenMM::NmPerAngstrom;
+    const double alpha = 4.5;
+    const int grid = 64;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 12;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_methanolbox(numAtoms, boxEdgeLength, forceField,  positions,  system,
+                     do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField->setPMEParameters(alpha, grid, grid, grid);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setCutoffDistance(cutoff);
+    forceField->setPolarizationType(MPIDForce::Mutual);
+    forceField->setMutualInducedTargetEpsilon(1e-9);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = 100.0504474;
+    vector<Vec3> refforces(12);
+    refforces[ 0] = Vec3( 0.4388189553, 0.9522405555, 0.2672560496);
+    refforces[ 1] = Vec3(  2.777531306,  1.838066758, -1.324503264);
+    refforces[ 2] = Vec3( -171.6371325,  -55.4322516,  12.31242062);
+    refforces[ 3] = Vec3(  54.16058488,   41.7924103, -18.66427193);
+    refforces[ 4] = Vec3(  67.20703716,  12.09901673,   23.9890797);
+    refforces[ 5] = Vec3(  46.52579002, -2.468623854, -16.59453047);
+    refforces[ 6] = Vec3( 0.9813590998, -1.522731637, -2.192162378);
+    refforces[ 7] = Vec3(  2.482149091,  -3.68831824, -6.597050313);
+    refforces[ 8] = Vec3(  12.53293583, -46.68126368,  204.8218207);
+    refforces[ 9] = Vec3(  13.32769034, -12.47156363, -64.76604457);
+    refforces[10] = Vec3( -26.51192626,  3.163484664, -46.15932637);
+    refforces[11] = Vec3( -2.283798937,   62.4210498, -85.09516775);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+}
+
+
+void testMethanolDimerEnergyAndForcesPMEExtrapolated() {
+    // Methanol box with anisotropic induced dipoles
+    const double cutoff = 12.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 24.61817*OpenMM::NmPerAngstrom;
+    const double alpha = 4.5;
+    const int grid = 64;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 12;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_methanolbox(numAtoms, boxEdgeLength, forceField,  positions,  system,
+                     do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField->setPMEParameters(alpha, grid, grid, grid);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setCutoffDistance(cutoff);
+    forceField->setPolarizationType(MPIDForce::Extrapolated);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = 100.0504681;
+    vector<Vec3> refforces(12);
+    refforces[ 0] = Vec3(   0.4386459215, 0.9522025306,  0.267328747);
+    refforces[ 1] = Vec3(    2.777209979,  1.838028711, -1.322817944);
+    refforces[ 2] = Vec3(   -171.6368608, -55.43214072,  12.31085332);
+    refforces[ 3] = Vec3(    54.16064157,  41.79252452, -18.66442754);
+    refforces[ 4] = Vec3(    67.20718391,  12.09904401,  23.98885744);
+    refforces[ 5] = Vec3(    46.52584453, -2.468600271, -16.59464003);
+    refforces[ 6] = Vec3(   0.9815162532, -1.523664025, -2.192401854);
+    refforces[ 7] = Vec3(    2.481328361, -3.687084437, -6.596605457);
+    refforces[ 8] = Vec3(    12.53339507, -46.68177374,  204.8218106);
+    refforces[ 9] = Vec3(    13.32778317, -12.47155711, -64.76600659);
+    refforces[10] = Vec3(   -26.51189553,  3.163501283, -46.15928124);
+    refforces[11] = Vec3(   -2.283753398,  62.42103563, -85.09514932);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+}
+
+
 void testWaterDimerEnergyAndForcesPMEDirect() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
@@ -948,12 +1108,11 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
     MPIDForce* forceField = new MPIDForce();
 
     vector<Vec3> positions;
-    vector<pair<int, int> > bonds;
     System system;
 
     const int numAtoms = 6;
 
-    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, bonds, system);
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system);
     forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
     forceField->setPMEParameters(alpha, grid, grid, grid);
     forceField->setDefaultTholeWidth(3.0);
@@ -994,7 +1153,6 @@ void testWaterDimerEnergyAndForcesPMEMutual() {
 
     vector<Vec3> positions;
 
-    vector<pair<int, int> > bonds;
     System system;
 
     const int numAtoms = 6;
@@ -1004,7 +1162,7 @@ void testWaterDimerEnergyAndForcesPMEMutual() {
     bool do_qpole  = true;
     bool do_opole  = true;
     bool do_pol    = true;
-    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, bonds, system,
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system,
                   do_charge, do_dpole, do_qpole, do_opole, do_pol);
     forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
     forceField->setPMEParameters(alpha, grid, grid, grid);
@@ -1036,6 +1194,7 @@ void testWaterDimerEnergyAndForcesPMEMutual() {
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
 }
 
+
 void testWaterDimerEnergyAndForcesPMEExtrapolated() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
@@ -1046,7 +1205,6 @@ void testWaterDimerEnergyAndForcesPMEExtrapolated() {
 
     vector<Vec3> positions;
 
-    vector<pair<int, int> > bonds;
     System system;
 
     const int numAtoms = 6;
@@ -1056,7 +1214,7 @@ void testWaterDimerEnergyAndForcesPMEExtrapolated() {
     bool do_qpole  = true;
     bool do_opole  = true;
     bool do_pol    = true;
-    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, bonds, system,
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system,
                   do_charge, do_dpole, do_qpole, do_opole, do_pol);
     forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
     forceField->setPMEParameters(alpha, grid, grid, grid);
@@ -1094,6 +1252,9 @@ int main(int numberOfArguments, char* argv[]) {
         std::cout << "TestReferenceMPIDForce running test..." << std::endl;
         registerMPIDReferenceKernelFactories();
 
+        testMethanolDimerEnergyAndForcesPMEExtrapolated();
+        testMethanolDimerEnergyAndForcesPMEDirect();
+        testMethanolDimerEnergyAndForcesPMEMutual();
         testWaterDimerEnergyAndForcesPMEDirect();
         testWaterDimerEnergyAndForcesPMEMutual();
         testWaterDimerEnergyAndForcesPMEExtrapolated();

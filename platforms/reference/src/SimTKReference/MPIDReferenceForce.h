@@ -567,7 +567,7 @@ public:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            damping factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of polarizability tensor for each particle
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -584,7 +584,7 @@ public:
                                    const std::vector<double> &octopoles,
                                    const std::vector<double>& tholes,
                                    const std::vector<double>& dampingFactors,
-                                   const std::vector<double>& polarity,
+                                   const vector<Vec3> &polarity,
                                    const std::vector<int>& axisTypes,
                                    const std::vector<int>& multipoleAtomZs,
                                    const std::vector<int>& multipoleAtomXs,
@@ -603,7 +603,7 @@ public:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            dampling factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of the polarizability tensor for each particle
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -618,7 +618,7 @@ public:
                                  const std::vector<double>& octopoles,
                                  const std::vector<double>& tholes,
                                  const std::vector<double>& dampingFactors,
-                                 const std::vector<double>& polarity,
+                                 const std::vector<Vec3>& polarity,
                                  const std::vector<int>& axisTypes,
                                  const std::vector<int>& multipoleAtomZs,
                                  const std::vector<int>& multipoleAtomXs,
@@ -637,7 +637,7 @@ public:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            dampling factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of the polarizability tensor
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -653,7 +653,7 @@ public:
                                            const std::vector<double>& octopoles,
                                            const std::vector<double>& tholes,
                                            const std::vector<double>& dampingFactors,
-                                           const std::vector<double>& polarity,
+                                           const vector<Vec3> &polarity,
                                            const std::vector<int>& axisTypes,
                                            const std::vector<int>& multipoleAtomZs,
                                            const std::vector<int>& multipoleAtomXs,
@@ -672,7 +672,7 @@ public:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            dampling factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of the polarizability tensor for each particle
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -689,7 +689,7 @@ public:
                                const std::vector<double>& octopoles,
                                const std::vector<double>& tholes,
                                const std::vector<double>& dampingFactors,
-                               const std::vector<double>& polarity,
+                               const vector<Vec3> &polarity,
                                const std::vector<int>& axisTypes,
                                const std::vector<int>& multipoleAtomZs,
                                const std::vector<int>& multipoleAtomXs,
@@ -710,7 +710,7 @@ public:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            dampling factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of the polarizability tensor for each particle
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -726,7 +726,7 @@ public:
                                                const std::vector<double>& octopoles,
                                                const std::vector<double>& tholes,
                                                const std::vector<double>& dampingFactors,
-                                               const std::vector<double>& polarity,
+                                               const std::vector<Vec3>& polarity,
                                                const std::vector<int>& axisTypes,
                                                const std::vector<int>& multipoleAtomZs,
                                                const std::vector<int>& multipoleAtomXs,
@@ -744,7 +744,7 @@ public:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            dampling factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of the polarizability tensor for each particle
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -760,7 +760,7 @@ public:
                                          const std::vector<double>& octopoles,
                                          const std::vector<double>& tholes,
                                          const std::vector<double>& dampingFactors,
-                                         const std::vector<double>& polarity,
+                                         const std::vector<Vec3>& polarity,
                                          const std::vector<int>& axisTypes,
                                          const std::vector<int>& multipoleAtomZs,
                                          const std::vector<int>& multipoleAtomXs,
@@ -794,7 +794,9 @@ protected:
             double sphericalOctopole[7];
             double thole;
             double dampingFactor;
-            double polarity;
+            Vec3 polarity;
+            double labPolarization[6];
+            bool isAnisotropic;
     };
     
     /**
@@ -812,10 +814,11 @@ protected:
      * Helper class used in calculating induced dipoles
      */
     struct UpdateInducedDipoleFieldStruct {
-            UpdateInducedDipoleFieldStruct(std::vector<OpenMM::Vec3>& inputFixed_E_Field, std::vector<OpenMM::Vec3>& inputInducedDipoles, std::vector<std::vector<Vec3> >& extrapolatedDipoles, std::vector<std::vector<double> >& extrapolatedDipoleFieldGradient);
+            UpdateInducedDipoleFieldStruct(std::vector<OpenMM::Vec3>& inputFixed_E_Field, std::vector<OpenMM::Vec3>& inputInducedDipoles, std::vector<std::vector<Vec3> >& extrapolatedDipoles, std::vector<std::vector<double> >& extrapolatedDipoleField, std::vector<std::vector<double> >& extrapolatedDipoleFieldGradient);
             std::vector<OpenMM::Vec3>* fixedMultipoleField;
             std::vector<OpenMM::Vec3>* inducedDipoles;
             std::vector<std::vector<Vec3> >* extrapolatedDipoles;
+            std::vector<std::vector<double> >* extrapolatedDipoleField;
             std::vector<std::vector<double> >* extrapolatedDipoleFieldGradient;
             std::vector<OpenMM::Vec3> inducedDipoleField;
             std::vector<std::vector<double> > inducedDipoleFieldGradient;
@@ -842,6 +845,8 @@ protected:
     std::vector<Vec3> _inducedDipolePolar;
     std::vector<std::vector<Vec3> > _ptDipoleP;
     std::vector<std::vector<Vec3> > _ptDipoleD;
+    std::vector<std::vector<double> > _ptDipoleFieldP;
+    std::vector<std::vector<double> > _ptDipoleFieldD;
     std::vector<std::vector<double> > _ptDipoleFieldGradientP;
     std::vector<std::vector<double> > _ptDipoleFieldGradientD;
 
@@ -873,18 +878,18 @@ protected:
      * @param octopoles           octopoles
      * @param tholes              Thole parameters
      * @param dampingFactors      dampming factors
-     * @param polarity            polarity
+     * @param polarity            diagonal elements of the polarizability tensor
      * @param particleData        output data struct
      *
      */
-    void loadParticleData(const std::vector<OpenMM::Vec3>& particlePositions, 
+    void loadParticleData(const std::vector<OpenMM::Vec3>& particlePositions,
                           const std::vector<double>& charges,
                           const std::vector<double>& dipoles,
                           const std::vector<double>& quadrupoles,
                           const std::vector<double>& octopoles,
                           const std::vector<double>& tholes,
                           const std::vector<double>& dampingFactors,
-                          const std::vector<double>& polarity,
+                          const vector<Vec3> &polarity,
                           std::vector<MultipoleParticleData>& particleData) const;
 
     /**
@@ -1204,7 +1209,7 @@ protected:
      * @param octopoles                 molecular frame octopoles for each particle
      * @param tholes                    Thole factors for each particle
      * @param dampingFactors            dampling factors for each particle
-     * @param polarity                  polarity for each particle
+     * @param polarity                  diagonal elements of the polarizability tensor for each particle
      * @param axisTypes                 axis type (Z-then-X, ...) for each particle
      * @param multipoleAtomZs           indicies of particle specifying the molecular frame z-axis for each particle
      * @param multipoleAtomXs           indicies of particle specifying the molecular frame x-axis for each particle
@@ -1220,7 +1225,7 @@ protected:
                const std::vector<double>& octopoles,
                const std::vector<double>& tholes,
                const std::vector<double>& dampingFactors,
-               const std::vector<double>& polarity,
+               const std::vector<Vec3>& polarity,
                const std::vector<int>& axisTypes,
                const std::vector<int>& multipoleAtomZs,
                const std::vector<int>& multipoleAtomXs,

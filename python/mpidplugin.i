@@ -243,11 +243,10 @@ public:
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param thole                Thole parameter
-     * @param dampingFactor        dampingFactor parameter
-     * @param polarity             polarity parameter
+     * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     int addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
-                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, double dampingFactor, double polarity);
+                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
 
     /**
      * Get the multipole parameters for a particle.
@@ -262,8 +261,7 @@ public:
      * @param[out] multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param[out] multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param[out] thole                Thole parameter
-     * @param[out] dampingFactor        dampingFactor parameter
-     * @param[out] polarity             polarity parameter
+     * @param[out] alphas		   	    A 3-vector containing the xx, yy and zz polarizabilities
      */
     %apply double& OUTPUT {double& charge};
     %apply std::vector<double>& OUTPUT {std::vector<double>& molecularDipole};
@@ -274,10 +272,9 @@ public:
     %apply int& OUTPUT {int& multipoleAtomX};
     %apply int& OUTPUT {int& multipoleAtomY};
     %apply double& OUTPUT {double& thole};
-    %apply double& OUTPUT {double& dampingFactor};
-    %apply double& OUTPUT {double& polarity};
+    %apply Vec3& OUTPUT {double& alphas};
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double>& molecularOctopole,
-                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, double& dampingFactor, double& polarity) const;
+                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, Vec3& alphas) const;
     %clear double& charge;
     %clear std::vector<double>& molecularDipole;
     %clear std::vector<double>& molecularQuadrupole;
@@ -287,8 +284,7 @@ public:
     %clear int& multipoleAtomX;
     %clear int& multipoleAtomY;
     %clear double& thole;
-    %clear double& dampingFactor;
-    %clear double& polarity;
+    %clear Vec3& alphas;
 
     /**
      * Set the multipole parameters for a particle.
@@ -303,11 +299,10 @@ public:
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param thole                thole parameter
-     * @param dampingFactor        damping factor parameter
-     * @param polarity             polarity parameter
+     * @param alphas			   A 3-vector containing the xx, yy and zz polarizabilities
      */
     void setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double> &molecularOctopole,
-                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, double dampingFactor, double polarity);
+                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
 
     /**
      * Set the CovalentMap for an atom

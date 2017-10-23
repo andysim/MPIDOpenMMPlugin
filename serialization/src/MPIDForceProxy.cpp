@@ -102,18 +102,18 @@ void MPIDForceProxy::serialize(const void* object, SerializationNode& node) cons
     for (unsigned int ii = 0; ii < static_cast<unsigned int>(force.getNumMultipoles()); ii++) {
 
         int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-        double charge, thole, dampingFactor, polarity;
+        double charge, thole, dampingFactor;
 
         std::vector<double> molecularDipole;
         std::vector<double> molecularQuadrupole;
         std::vector<double> molecularOctopole;
-
+        Vec3 alphas;
         force.getMultipoleParameters(ii, charge, molecularDipole, molecularQuadrupole, molecularOctopole,
-                                     axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, thole, dampingFactor, polarity);
+                                     axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, thole, alphas);
 
         SerializationNode& particle    = particles.createChildNode("Particle");
         particle.setIntProperty("axisType", axisType).setIntProperty("multipoleAtomZ", multipoleAtomZ).setIntProperty("multipoleAtomX", multipoleAtomX).setIntProperty("multipoleAtomY", multipoleAtomY);
-        particle.setDoubleProperty("charge", charge).setDoubleProperty("thole", thole).setDoubleProperty("damp", dampingFactor).setDoubleProperty("polarity", polarity);
+        particle.setDoubleProperty("charge", charge).setDoubleProperty("thole", thole).setDoubleProperty("damp", dampingFactor).setDoubleProperty("alphaxx", alphas[0]).setDoubleProperty("alphayy", alphas[1]).setDoubleProperty("alphazz", alphas[2]);
 
         SerializationNode& dipole      = particle.createChildNode("Dipole");
         dipole.setDoubleProperty("d0", molecularDipole[0]).setDoubleProperty("d1", molecularDipole[1]).setDoubleProperty("d2", molecularDipole[2]);
@@ -241,7 +241,7 @@ void* MPIDForceProxy::deserialize(const SerializationNode& node) const {
                                 particle.getIntProperty("multipoleAtomX"),
                                 particle.getIntProperty("multipoleAtomY"),
                                 particle.getDoubleProperty("thole"),
-                                particle.getDoubleProperty("damp"), particle.getDoubleProperty("polarity"));
+                                Vec3(particle.getDoubleProperty("alphaxx"), particle.getDoubleProperty("alphayy"), particle.getDoubleProperty("alphazz")));
 
             // covalent maps 
 

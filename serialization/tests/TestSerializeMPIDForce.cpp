@@ -97,7 +97,7 @@ void testSerialization() {
             molecularOctopole.push_back(static_cast<double>(rand()));
         }
         force1.addMultipole(static_cast<double>(ii+1), molecularDipole, molecularQuadrupole, molecularOctopole, MPIDForce::Bisector,
-                            ii+1, ii+2, ii+3, static_cast<double>(rand()), static_cast<double>(rand()), static_cast<double>(rand()));
+                            ii+1, ii+2, ii+3, static_cast<double>(rand()), Vec3(static_cast<double>(rand()), static_cast<double>(rand()), static_cast<double>(rand())));
 
         for (unsigned int jj = 0; jj < covalentTypes.size(); jj++) {
             std::vector< int > covalentMap;
@@ -148,16 +148,18 @@ void testSerialization() {
         std::vector<double> molecularDipole1;
         std::vector<double> molecularQuadrupole1;
         std::vector<double> molecularOctopole1;
+        Vec3 alphas1;
 
         std::vector<double> molecularDipole2;
         std::vector<double> molecularQuadrupole2;
         std::vector<double> molecularOctopole2;
+        Vec3 alphas2;
 
         force1.getMultipoleParameters(ii, charge1, molecularDipole1, molecularQuadrupole1, molecularOctopole1, axisType1, multipoleAtomZ1, multipoleAtomX1, multipoleAtomY1,
-                                       thole1, dampingFactor1, polarity1);
+                                       thole1, alphas1);
 
         force2.getMultipoleParameters(ii, charge2, molecularDipole2, molecularQuadrupole2, molecularOctopole2, axisType2, multipoleAtomZ2, multipoleAtomX2, multipoleAtomY2,
-                                       thole2, dampingFactor2, polarity2);
+                                       thole2, alphas2);
 
         ASSERT_EQUAL(charge1,                        charge2);
         ASSERT_EQUAL(axisType1,                      axisType2);
@@ -165,8 +167,7 @@ void testSerialization() {
         ASSERT_EQUAL(multipoleAtomX1,                multipoleAtomX2);
         ASSERT_EQUAL(multipoleAtomY1,                multipoleAtomY2);
         ASSERT_EQUAL(thole1,                         thole2);
-        ASSERT_EQUAL(dampingFactor1,                 dampingFactor2);
-        ASSERT_EQUAL(polarity1,                      polarity2);
+        ASSERT_EQUAL(alphas1,                        alphas2);
 
         ASSERT_EQUAL(molecularDipole1.size(),        molecularDipole2.size());
         ASSERT_EQUAL(molecularDipole1.size(),        3);

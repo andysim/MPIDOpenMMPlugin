@@ -74,10 +74,11 @@ void MPIDForceImpl::initialize(ContextImpl& context) {
         std::vector<double> molecularDipole;
         std::vector<double> molecularQuadrupole;
         std::vector<double> molecularOctopole;
+        Vec3 alphas;
 
         owner.getMultipoleParameters(ii, charge, molecularDipole, molecularQuadrupole, molecularOctopole, axisType,
                                      multipoleAtomZ, multipoleAtomX, multipoleAtomY,
-                                     thole, dampingFactor, polarity);
+                                     thole, alphas);
 
        // check quadrupole is traceless and symmetric
 
