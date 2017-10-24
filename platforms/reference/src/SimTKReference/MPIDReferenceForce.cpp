@@ -3694,9 +3694,9 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
         multipole[2] = particleData[i].dipole[1];
         multipole[3] = particleData[i].dipole[2];
         if (polarizationType == MPIDReferenceForce::Mutual && particleData[i].isAnisotropic){
-            multipole[1] += 0.5*_inducedDipole[i][0];
-            multipole[2] += 0.5*_inducedDipole[i][1];
-            multipole[3] += 0.5*_inducedDipole[i][2];
+            multipole[1] += _inducedDipole[i][0];
+            multipole[2] += _inducedDipole[i][1];
+            multipole[3] += _inducedDipole[i][2];
         }
         multipole[4] = particleData[i].quadrupole[QXX];
         multipole[5] = particleData[i].quadrupole[QYY];
@@ -3758,7 +3758,6 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
                       - phi[17]*multipole[14]
                       + phi[15]*(-multipole[11] - 3.0*multipole[16] + 4.0*multipole[18])/5.0
                       + phi[18]*(3.0*multipole[10] + multipole[13] - 4.0*multipole[15])/5.0);
-
         // Compute the force and energy.
 
         multipole[1] = _transformed[i].dipole[0];

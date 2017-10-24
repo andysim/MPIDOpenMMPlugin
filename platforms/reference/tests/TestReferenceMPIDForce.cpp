@@ -884,6 +884,37 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     }
 }
 
+static void check_full_finite_differences(vector<Vec3> analytic_forces, Context &context, vector<Vec3> positions, double stepSize = 1e-4, double tol=1e-4)
+{
+    // Take a small step in the direction of the energy gradient and see whether the potential energy changes by the expected amount.
+
+    int natoms = analytic_forces.size();
+    vector<Vec3> coords;
+    std::copy(positions.begin(), positions.end(), std::back_inserter(coords));
+    State state;
+    for (int atom = 0; atom < natoms; ++atom) {
+        for(int xyz = 0; xyz < 3; ++xyz){
+            // Positive displacement
+            coords[atom][xyz] += stepSize;
+            context.setPositions(coords);
+            state = context.getState(State::Energy);
+            double Ep = state.getPotentialEnergy();
+            coords[atom][xyz] -= stepSize;
+            // Negative displacement
+            coords[atom][xyz] -= stepSize;
+            context.setPositions(coords);
+            state = context.getState(State::Energy);
+            double Em = state.getPotentialEnergy();
+            coords[atom][xyz] += stepSize;
+            // Check gradient component
+            double findif = (Em - Ep) / (2.0*stepSize);
+            cout << findif << "  " << analytic_forces[atom][xyz] <<  "  " << findif-analytic_forces[atom][xyz] << endl;
+            ASSERT_EQUAL_TOL(findif, analytic_forces[atom][xyz], tol);
+        }
+    }
+}
+
+
 static void check_finite_differences(vector<Vec3> analytic_forces, Context &context, vector<Vec3> positions)
 {
     // Take a small step in the direction of the energy gradient and see whether the potential energy changes by the expected amount.
@@ -985,6 +1016,8 @@ void testMethanolDimerEnergyAndForcesPMEDirect() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
 
@@ -1022,15 +1055,15 @@ void testMethanolDimerEnergyAndForcesPMEMutual() {
 
     double refenergy = 100.0504474;
     vector<Vec3> refforces(12);
-    refforces[ 0] = Vec3( 0.4388189553, 0.9522405555, 0.2672560496);
-    refforces[ 1] = Vec3(  2.777531306,  1.838066758, -1.324503264);
-    refforces[ 2] = Vec3( -171.6371325,  -55.4322516,  12.31242062);
+    refforces[ 0] = Vec3( 0.4388594821, 0.9521924897, 0.2671912158);
+    refforces[ 1] = Vec3(  2.777500031,  1.838096302, -1.324401146);
+    refforces[ 2] = Vec3( -171.6371418, -55.43223308,  12.31238334);
     refforces[ 3] = Vec3(  54.16058488,   41.7924103, -18.66427193);
     refforces[ 4] = Vec3(  67.20703716,  12.09901673,   23.9890797);
     refforces[ 5] = Vec3(  46.52579002, -2.468623854, -16.59453047);
-    refforces[ 6] = Vec3( 0.9813590998, -1.522731637, -2.192162378);
-    refforces[ 7] = Vec3(  2.482149091,  -3.68831824, -6.597050313);
-    refforces[ 8] = Vec3(  12.53293583, -46.68126368,  204.8218207);
+    refforces[ 6] = Vec3( 0.9813019371, -1.522530551, -2.192107901);
+    refforces[ 7] = Vec3(  2.482201239, -3.688511419, -6.597103453);
+    refforces[ 8] = Vec3(  12.53294084, -46.68127158,  204.8218193);
     refforces[ 9] = Vec3(  13.32769034, -12.47156363, -64.76604457);
     refforces[10] = Vec3( -26.51192626,  3.163484664, -46.15932637);
     refforces[11] = Vec3( -2.283798937,   62.4210498, -85.09516775);
@@ -1041,6 +1074,8 @@ void testMethanolDimerEnergyAndForcesPMEMutual() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-7, 5E-4);
 }
 
 
@@ -1096,6 +1131,8 @@ void testMethanolDimerEnergyAndForcesPMEExtrapolated() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
 
@@ -1140,6 +1177,8 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
 
@@ -1192,6 +1231,8 @@ void testWaterDimerEnergyAndForcesPMEMutual() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
 
@@ -1243,6 +1284,8 @@ void testWaterDimerEnergyAndForcesPMEExtrapolated() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
 
