@@ -55,6 +55,7 @@ const double sqrtFiveHalves = sqrt(5.0/2.0);
 const double sqrtThreeFifths = sqrt(3.0/5.0);
 const double oneNinth = 1.0/9.0;
 const double fourOverFortyFive = 4.0/45.0;
+const double twoOverFifteen = 2.0/15.0;
 const double fourOverFifteen = 4.0/15.0;
 const double eightOverOneHundredFive = 8.0/105.0;
 
@@ -840,14 +841,9 @@ protected:
 
     std::vector<TransformedMultipole> _transformed;
     std::vector<Vec3> _fixedMultipoleField;
-    std::vector<Vec3> _fixedMultipoleFieldPolar;
     std::vector<Vec3> _inducedDipole;
-    std::vector<Vec3> _inducedDipolePolar;
-    std::vector<std::vector<Vec3> > _ptDipoleP;
     std::vector<std::vector<Vec3> > _ptDipoleD;
-    std::vector<std::vector<double> > _ptDipoleFieldP;
     std::vector<std::vector<double> > _ptDipoleFieldD;
-    std::vector<std::vector<double> > _ptDipoleFieldGradientP;
     std::vector<std::vector<double> > _ptDipoleFieldGradientD;
 
     double _defaultTholeWidth;
@@ -1624,10 +1620,8 @@ private:
      * Spread induced dipoles onto grid.
      *
      * @param inputInducedDipole      induced dipole value
-     * @param inputInducedDipolePolar induced dipole polar value
      */
-    void spreadInducedDipolesOnGrid(const std::vector<Vec3>& inputInducedDipole,
-                                    const std::vector<Vec3>& inputInducedDipolePolar);
+    void spreadInducedDipolesOnGrid(const std::vector<Vec3>& inputInducedDipole);
 
     /**
      * Calculate induced dipole fields.
@@ -1642,10 +1636,9 @@ private:
      * Set reciprocal space induced dipole fields. 
      *
      * @param field       reciprocal space output induced dipole field value at each site
-     * @param fieldPolar  reciprocal space output induced dipole polar field value at each site
      * 
      */
-    void recordInducedDipoleField(vector<Vec3>& field, vector<Vec3>& fieldPolar);
+    void recordInducedDipoleField(vector<Vec3>& field);
 
     /**
      * Compute Pme self energy.

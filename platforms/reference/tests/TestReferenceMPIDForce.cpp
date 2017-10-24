@@ -1252,12 +1252,12 @@ int main(int numberOfArguments, char* argv[]) {
         std::cout << "TestReferenceMPIDForce running test..." << std::endl;
         registerMPIDReferenceKernelFactories();
 
-        testMethanolDimerEnergyAndForcesPMEExtrapolated();
-        testMethanolDimerEnergyAndForcesPMEDirect();
-        testMethanolDimerEnergyAndForcesPMEMutual();
         testWaterDimerEnergyAndForcesPMEDirect();
         testWaterDimerEnergyAndForcesPMEMutual();
         testWaterDimerEnergyAndForcesPMEExtrapolated();
+        testMethanolDimerEnergyAndForcesPMEExtrapolated();
+        testMethanolDimerEnergyAndForcesPMEDirect();
+        testMethanolDimerEnergyAndForcesPMEMutual();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;
