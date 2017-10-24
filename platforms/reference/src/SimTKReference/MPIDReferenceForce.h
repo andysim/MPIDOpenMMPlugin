@@ -1442,8 +1442,6 @@ private:
     std::vector<double5> _thetai[3];
     std::vector<IntVec> _iGrid;
     std::vector<double> _phi;
-    std::vector<double> _phid;
-    std::vector<double> _phip;
     std::vector<double> _phidp;
     std::vector<double4> _pmeBsplineTheta;
     std::vector<double4> _pmeBsplineDtheta;

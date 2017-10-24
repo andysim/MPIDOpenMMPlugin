@@ -2453,8 +2453,6 @@ void MPIDReferencePmeForce::resizePmeArrays()
 
     _iGrid.resize(_numParticles);
     _phi.resize(35*_numParticles);
-    _phid.resize(10*_numParticles);
-    _phip.resize(10*_numParticles);
     _phidp.resize(35*_numParticles);
 }
 
@@ -3365,7 +3363,7 @@ void MPIDReferencePmeForce::spreadInducedDipolesOnGrid(const vector<Vec3>& input
 
                     t_complex& gridValue = _pmeGrid[x*_pmeGridDimensions[1]*_pmeGridDimensions[2]+y*_pmeGridDimensions[2]+z];
                     gridValue.re += term01*t[0] + term11*t[1];
-                    gridValue.im += term01*t[0] + term11*t[1];
+                    gridValue.im = 0.0;
                 }
             }
         }
@@ -3378,24 +3376,6 @@ void MPIDReferencePmeForce::computeInducedPotentialFromGrid()
 
     for (int m = 0; m < _numParticles; m++) {
         IntVec gridPoint = _iGrid[m];
-        double tuv100_1 = 0.0;
-        double tuv010_1 = 0.0;
-        double tuv001_1 = 0.0;
-        double tuv200_1 = 0.0;
-        double tuv020_1 = 0.0;
-        double tuv002_1 = 0.0;
-        double tuv110_1 = 0.0;
-        double tuv101_1 = 0.0;
-        double tuv011_1 = 0.0;
-        double tuv100_2 = 0.0;
-        double tuv010_2 = 0.0;
-        double tuv001_2 = 0.0;
-        double tuv200_2 = 0.0;
-        double tuv020_2 = 0.0;
-        double tuv002_2 = 0.0;
-        double tuv110_2 = 0.0;
-        double tuv101_2 = 0.0;
-        double tuv011_2 = 0.0;
         double tuv000 = 0.0;
         double tuv001 = 0.0;
         double tuv010 = 0.0;
@@ -3434,18 +3414,6 @@ void MPIDReferencePmeForce::computeInducedPotentialFromGrid()
         for (int iz = 0; iz < MPID_PME_ORDER; iz++) {
             int k = gridPoint[2]+iz-(gridPoint[2]+iz >= _pmeGridDimensions[2] ? _pmeGridDimensions[2] : 0);
             double5 v = _thetai[2][m*MPID_PME_ORDER+iz];
-            double tu00_1 = 0.0;
-            double tu01_1 = 0.0;
-            double tu10_1 = 0.0;
-            double tu20_1 = 0.0;
-            double tu11_1 = 0.0;
-            double tu02_1 = 0.0;
-            double tu00_2 = 0.0;
-            double tu01_2 = 0.0;
-            double tu10_2 = 0.0;
-            double tu20_2 = 0.0;
-            double tu11_2 = 0.0;
-            double tu02_2 = 0.0;
             double tu00 = 0.0;
             double tu10 = 0.0;
             double tu01 = 0.0;
@@ -3464,77 +3432,34 @@ void MPIDReferencePmeForce::computeInducedPotentialFromGrid()
             for (int iy = 0; iy < MPID_PME_ORDER; iy++) {
                 int j = gridPoint[1]+iy-(gridPoint[1]+iy >= _pmeGridDimensions[1] ? _pmeGridDimensions[1] : 0);
                 double5 u = _thetai[1][m*MPID_PME_ORDER+iy];
-                double t0_1 = 0.0;
-                double t1_1 = 0.0;
-                double t2_1 = 0.0;
-                double t0_2 = 0.0;
-                double t1_2 = 0.0;
-                double t2_2 = 0.0;
-                double t3 = 0.0;
-                double t4 = 0.0;
+                double5 t = double5(0.0, 0.0, 0.0, 0.0, 0.0);
                 for (int ix = 0; ix < MPID_PME_ORDER; ix++) {
                     int i = gridPoint[0]+ix-(gridPoint[0]+ix >= _pmeGridDimensions[0] ? _pmeGridDimensions[0] : 0);
                     int gridIndex = i*_pmeGridDimensions[1]*_pmeGridDimensions[2] + j*_pmeGridDimensions[2] + k;
-                    t_complex tq = _pmeGrid[gridIndex];
+                    double tq = _pmeGrid[gridIndex].re;
                     double5 tadd = _thetai[0][m*MPID_PME_ORDER+ix];
-                    t0_1 += tq.re*tadd[0];
-                    t1_1 += tq.re*tadd[1];
-                    t2_1 += tq.re*tadd[2];
-                    t0_2 += tq.im*tadd[0];
-                    t1_2 += tq.im*tadd[1];
-                    t2_2 += tq.im*tadd[2];
-                    t3 += (tq.re+tq.im)*tadd[3];
-                    t4 += (tq.re+tq.im)*tadd[4];
+                    t[0] += tq*tadd[0];
+                    t[1] += tq*tadd[1];
+                    t[2] += tq*tadd[2];
+                    t[3] += tq*tadd[3];
+                    t[4] += tq*tadd[4];
                 }
-                tu00_1 += t0_1*u[0];
-                tu10_1 += t1_1*u[0];
-                tu01_1 += t0_1*u[1];
-                tu20_1 += t2_1*u[0];
-                tu11_1 += t1_1*u[1];
-                tu02_1 += t0_1*u[2];
-                tu00_2 += t0_2*u[0];
-                tu10_2 += t1_2*u[0];
-                tu01_2 += t0_2*u[1];
-                tu20_2 += t2_2*u[0];
-                tu11_2 += t1_2*u[1];
-                tu02_2 += t0_2*u[2];
-                double t0 = t0_1 + t0_2;
-                double t1 = t1_1 + t1_2;
-                double t2 = t2_1 + t2_2;
-                tu00 += t0*u[0];
-                tu10 += t1*u[0];
-                tu01 += t0*u[1];
-                tu20 += t2*u[0];
-                tu11 += t1*u[1];
-                tu02 += t0*u[2];
-                tu30 += t3*u[0];
-                tu21 += t2*u[1];
-                tu12 += t1*u[2];
-                tu03 += t0*u[3];
-                tu40 += t4*u[0];
-                tu04 += t0*u[4];
-                tu31 += t3*u[1];
-                tu13 += t1*u[3];
-                tu22 += t2*u[2];
+                tu00 += t[0]*u[0];
+                tu10 += t[1]*u[0];
+                tu01 += t[0]*u[1];
+                tu20 += t[2]*u[0];
+                tu11 += t[1]*u[1];
+                tu02 += t[0]*u[2];
+                tu30 += t[3]*u[0];
+                tu21 += t[2]*u[1];
+                tu12 += t[1]*u[2];
+                tu03 += t[0]*u[3];
+                tu40 += t[4]*u[0];
+                tu04 += t[0]*u[4];
+                tu31 += t[3]*u[1];
+                tu13 += t[1]*u[3];
+                tu22 += t[2]*u[2];
             }
-            tuv100_1 += tu10_1*v[0];
-            tuv010_1 += tu01_1*v[0];
-            tuv001_1 += tu00_1*v[1];
-            tuv200_1 += tu20_1*v[0];
-            tuv020_1 += tu02_1*v[0];
-            tuv002_1 += tu00_1*v[2];
-            tuv110_1 += tu11_1*v[0];
-            tuv101_1 += tu10_1*v[1];
-            tuv011_1 += tu01_1*v[1];
-            tuv100_2 += tu10_2*v[0];
-            tuv010_2 += tu01_2*v[0];
-            tuv001_2 += tu00_2*v[1];
-            tuv200_2 += tu20_2*v[0];
-            tuv020_2 += tu02_2*v[0];
-            tuv002_2 += tu00_2*v[2];
-            tuv110_2 += tu11_2*v[0];
-            tuv101_2 += tu10_2*v[1];
-            tuv011_2 += tu01_2*v[1];
             tuv000 += tu00*v[0];
             tuv100 += tu10*v[0];
             tuv010 += tu01*v[0];
@@ -3792,7 +3717,7 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
         multipole[19] = particleData[i].octopole[QZZZ];
 
         const double* phi = &cphi[20*i];
-        torques[iIndex][0] += 0.5*_electric*(multipole[3]*phi[2] - multipole[2]*phi[3]
+        torques[iIndex][0] += _electric*(multipole[3]*phi[2] - multipole[2]*phi[3]
                       + 2.0*(multipole[6]-multipole[5])*phi[9]
                       + multipole[8]*phi[7] + multipole[9]*phi[5]
                       - multipole[7]*phi[8] - multipole[9]*phi[6]
@@ -3806,7 +3731,7 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
                       + phi[18]*(-multipole[12] - 11.0*multipole[17] + 12.0*multipole[19])/5.0
                       + phi[19]*(multipole[11] + 3.0*multipole[16] - 4.0*multipole[18])/5.0);
 
-        torques[iIndex][1] += 0.5*_electric*(multipole[1]*phi[3] - multipole[3]*phi[1]
+        torques[iIndex][1] += _electric*(multipole[1]*phi[3] - multipole[3]*phi[1]
                       + 2.0*(multipole[4]-multipole[6])*phi[8]
                       + multipole[7]*phi[9] + multipole[8]*phi[6]
                       - multipole[8]*phi[4] - multipole[9]*phi[7]
@@ -3820,7 +3745,7 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
                       + phi[18]*multipole[14]
                       + phi[19]*(-3.0*multipole[10] - multipole[13] + 4.0*multipole[15])/5.0);
 
-        torques[iIndex][2] += 0.5*_electric*(multipole[2]*phi[1] - multipole[1]*phi[2]
+        torques[iIndex][2] += _electric*(multipole[2]*phi[1] - multipole[1]*phi[2]
                       + 2.0*(multipole[5]-multipole[4])*phi[7]
                       + multipole[7]*phi[4] + multipole[9]*phi[8]
                       - multipole[7]*phi[5] - multipole[8]*phi[9]
@@ -3877,16 +3802,16 @@ double MPIDReferencePmeForce::computeReciprocalSpaceInducedDipoleForceAndEnergy(
             f[2] += 2.0*inducedDipole[k]*_phi[35*i+j3];
  
             if (polarizationType == MPIDReferenceForce::Mutual) {
-                f[0] += inducedDipole[k]*_phidp[35*i+j1];
-                f[1] += inducedDipole[k]*_phidp[35*i+j2];
-                f[2] += inducedDipole[k]*_phidp[35*i+j3];
+                f[0] += inducedDipole[k]*2.0*_phidp[35*i+j1];
+                f[1] += inducedDipole[k]*2.0*_phidp[35*i+j2];
+                f[2] += inducedDipole[k]*2.0*_phidp[35*i+j3];
             }
         }
 
         for (int k = 0; k < 20; k++) {
-            f[0] += multipole[k]*_phidp[35*i+deriv1[k]];
-            f[1] += multipole[k]*_phidp[35*i+deriv2[k]];
-            f[2] += multipole[k]*_phidp[35*i+deriv3[k]];
+            f[0] += multipole[k]*2.0*_phidp[35*i+deriv1[k]];
+            f[1] += multipole[k]*2.0*_phidp[35*i+deriv2[k]];
+            f[2] += multipole[k]*2.0*_phidp[35*i+deriv3[k]];
         }
 
         f              *= (0.5*_electric);
@@ -3925,9 +3850,9 @@ void MPIDReferencePmeForce::recordInducedDipoleField(vector<Vec3>& field)
             fracToCart[i][j] = _pmeGridDimensions[j]*_recipBoxVectors[i][j];
     for (int i = 0; i < _numParticles; i++) {
 
-        field[i][0] -= 0.5*(_phidp[35*i+1]*fracToCart[0][0] + _phidp[35*i+2]*fracToCart[0][1] + _phidp[35*i+3]*fracToCart[0][2]);
-        field[i][1] -= 0.5*(_phidp[35*i+1]*fracToCart[1][0] + _phidp[35*i+2]*fracToCart[1][1] + _phidp[35*i+3]*fracToCart[1][2]);
-        field[i][2] -= 0.5*(_phidp[35*i+1]*fracToCart[2][0] + _phidp[35*i+2]*fracToCart[2][1] + _phidp[35*i+3]*fracToCart[2][2]);
+        field[i][0] -= _phidp[35*i+1]*fracToCart[0][0] + _phidp[35*i+2]*fracToCart[0][1] + _phidp[35*i+3]*fracToCart[0][2];
+        field[i][1] -= _phidp[35*i+1]*fracToCart[1][0] + _phidp[35*i+2]*fracToCart[1][1] + _phidp[35*i+3]*fracToCart[1][2];
+        field[i][2] -= _phidp[35*i+1]*fracToCart[2][0] + _phidp[35*i+2]*fracToCart[2][1] + _phidp[35*i+3]*fracToCart[2][2];
     }
 }
 
@@ -3985,12 +3910,12 @@ void MPIDReferencePmeForce::calculateInducedDipoleFields(const vector<MultipoleP
             double Exx = 0.0, Eyy = 0.0, Ezz = 0.0, Exy = 0.0, Exz = 0.0, Eyz = 0.0;
             for (int k = 0; k < 3; ++k) {
                 for (int l = 0; l < 3; ++l) {
-                    Exx += fracToCart[0][k] * 0.5*EmatD[k][l] * fracToCart[0][l];
-                    Eyy += fracToCart[1][k] * 0.5*EmatD[k][l] * fracToCart[1][l];
-                    Ezz += fracToCart[2][k] * 0.5*EmatD[k][l] * fracToCart[2][l];
-                    Exy += fracToCart[0][k] * 0.5*EmatD[k][l] * fracToCart[1][l];
-                    Exz += fracToCart[0][k] * 0.5*EmatD[k][l] * fracToCart[2][l];
-                    Eyz += fracToCart[1][k] * 0.5*EmatD[k][l] * fracToCart[2][l];
+                    Exx += fracToCart[0][k] * EmatD[k][l] * fracToCart[0][l];
+                    Eyy += fracToCart[1][k] * EmatD[k][l] * fracToCart[1][l];
+                    Ezz += fracToCart[2][k] * EmatD[k][l] * fracToCart[2][l];
+                    Exy += fracToCart[0][k] * EmatD[k][l] * fracToCart[1][l];
+                    Exz += fracToCart[0][k] * EmatD[k][l] * fracToCart[2][l];
+                    Eyz += fracToCart[1][k] * EmatD[k][l] * fracToCart[2][l];
                 }
             }
             updateInducedDipoleFields[0].inducedDipoleFieldGradient[i][0] -= Exx;
