@@ -45,19 +45,31 @@ const double oneThird = 1.0/3.0;
 const double twoThirds = 2.0/3.0;
 const double fourThirds = 4.0/3.0;
 const double fourSqrtOneThird = 4.0/sqrt(3.0);
+const double sqrtTwoThirds = sqrt(2.0/3.0);
 const double sqrtFourThirds = 2.0/sqrt(3.0);
 const double sqrtOneThird = 1.0/sqrt(3.0);
 const double sqrtOneTenth = 1.0/sqrt(10.0);
+const double sqrtTwo = sqrt(2.0);
 const double sqrtThree = sqrt(3.0);
+const double sqrtFive = sqrt(5.0);
 const double sqrtSix = sqrt(6.0);
+const double sqrtEightOverFifteen = sqrt(8.0)/15.0;
 const double sqrtThreeHalves = sqrt(3.0/2.0);
 const double sqrtFiveHalves = sqrt(5.0/2.0);
 const double sqrtThreeFifths = sqrt(3.0/5.0);
+const double twoSqrtFiveOverFifteen = 2.0*sqrt(5.0)/15.0;
 const double oneNinth = 1.0/9.0;
 const double fourOverFortyFive = 4.0/45.0;
+const double fourOverTwoTwoFive = 4.0/225.0;
+const double eightOverFortyFive = 8.0/45.0;
+const double eightOverSeventyFive = 8.0/75.0;
+const double eightOverFiveTwoFive = 8.0/525.0;
+const double eightOverOneFiveSevenFive = 8.0/1575.0;
 const double twoOverFifteen = 2.0/15.0;
+const double twoOverOneFiveZero = 2.0/150.0;
 const double fourOverFifteen = 4.0/15.0;
 const double eightOverOneHundredFive = 8.0/105.0;
+const double sixteenOverFifteen = 16.0/15.0;
 
 
 /**
@@ -968,7 +980,7 @@ protected:
      * @param  dScale              output d-scale factor
      * @param  pScale              output p-scale factor
      */
-    void getAndScaleInverseRs(double dampI, double dampJ, double tholeI, double tholeJ,
+    void getAndScaleInverseRs(double dampI, double dampJ, double pscale, double tholeI, double tholeJ,
                               double r, std::vector<double>& rrI) const;
 
     /**

@@ -1021,6 +1021,58 @@ void testMethanolDimerEnergyAndForcesPMEDirect() {
 }
 
 
+void testMethanolDimerEnergyAndForcesNoCutDirect() {
+    // Methanol box with anisotropic induced dipoles
+    double boxEdgeLength = 24.61817*OpenMM::NmPerAngstrom;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 12;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_methanolbox(numAtoms, boxEdgeLength, forceField,  positions,  system,
+                     do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setPolarizationType(MPIDForce::Direct);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = 100.1450368;
+    vector<Vec3> refforces(12);
+    refforces[ 0] = Vec3( 0.6174995598,  1.244096979,  0.348989958);
+    refforces[ 1] = Vec3(  3.137118729,  3.021474796, -1.106999557);
+    refforces[ 2] = Vec3( -171.9469062, -56.30042257,  12.15631129);
+    refforces[ 3] = Vec3(  54.08177809,   41.6113696, -18.72649827);
+    refforces[ 4] = Vec3(  67.11127323,  11.90291724,  23.93260176);
+    refforces[ 5] = Vec3(  46.43808439, -2.657609686, -16.65242704);
+    refforces[ 6] = Vec3(  1.145664625, -1.273449694, -2.195120655);
+    refforces[ 7] = Vec3(  3.279367693, -2.747189115, -6.426036552);
+    refforces[ 8] = Vec3(  11.97765566,  -47.3716712,  204.7396685);
+    refforces[ 9] = Vec3(   13.2133728, -12.64907132, -64.79384161);
+    refforces[10] = Vec3(  -26.6461126,  2.986684944, -46.17490959);
+    refforces[11] = Vec3( -2.408796023,  62.23287002, -85.10173827);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+}
+
+
 void testMethanolDimerEnergyAndForcesPMEMutual() {
     // Methanol box with anisotropic induced dipoles
     const double cutoff = 12.0*OpenMM::NmPerAngstrom;
@@ -1067,6 +1119,59 @@ void testMethanolDimerEnergyAndForcesPMEMutual() {
     refforces[ 9] = Vec3(  13.32769034, -12.47156363, -64.76604457);
     refforces[10] = Vec3( -26.51192626,  3.163484664, -46.15932637);
     refforces[11] = Vec3( -2.283798937,   62.4210498, -85.09516775);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-7, 5E-4);
+}
+
+
+void testMethanolDimerEnergyAndForcesNoCutMutual() {
+    // Methanol box with anisotropic induced dipoles
+    double boxEdgeLength = 24.61817*OpenMM::NmPerAngstrom;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 12;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_methanolbox(numAtoms, boxEdgeLength, forceField,  positions,  system,
+                     do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setPolarizationType(MPIDForce::Mutual);
+    forceField->setMutualInducedTargetEpsilon(1e-9);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = 100.1448049;
+    vector<Vec3> refforces(12);
+    refforces[ 0] = Vec3( 0.6146981707,  1.242855684, 0.3501794855);
+    refforces[ 1] = Vec3(  3.138053829,  3.015667252, -1.097214746);
+    refforces[ 2] = Vec3( -171.9461828,  -56.2941539,  12.14771521);
+    refforces[ 3] = Vec3(  54.08147012,  41.61310529, -18.72725151);
+    refforces[ 4] = Vec3(  67.11169642,  11.90414732,  23.93089623);
+    refforces[ 5] = Vec3(  46.43814212, -2.656771939, -16.65320792);
+    refforces[ 6] = Vec3(  1.148313779, -1.285002369,  -2.19739517);
+    refforces[ 7] = Vec3(  3.272634556, -2.742477113, -6.424799549);
+    refforces[ 8] = Vec3(  11.98002773, -47.36966527,   204.740509);
+    refforces[ 9] = Vec3(   13.2147849,  -12.6483558, -64.79345216);
+    refforces[10] = Vec3( -26.64557285,  2.987466517, -46.17438593);
+    refforces[11] = Vec3( -2.408065932,  62.23318433, -85.10159295);
     State state = context.getState(State::Forces | State::Energy);
     double energy = state.getPotentialEnergy();
     const vector<Vec3>& forces = state.getForces();
@@ -1136,6 +1241,108 @@ void testMethanolDimerEnergyAndForcesPMEExtrapolated() {
 }
 
 
+void testMethanolDimerEnergyAndForcesNoCutExtrapolated() {
+    // Methanol box with anisotropic induced dipoles
+    double boxEdgeLength = 24.61817*OpenMM::NmPerAngstrom;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 12;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_methanolbox(numAtoms, boxEdgeLength, forceField,  positions,  system,
+                     do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setPolarizationType(MPIDForce::Extrapolated);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = 100.1448069;
+    vector<Vec3> refforces(12);
+    refforces[ 0] = Vec3(  0.614432954,  1.242906733, 0.3503053956);
+    refforces[ 1] = Vec3(  3.137966848,  3.015167967, -1.095483178);
+    refforces[ 2] = Vec3(  -171.946053, -56.29375527,  12.14612877);
+    refforces[ 3] = Vec3(  54.08150029,  41.61324303,  -18.7274072);
+    refforces[ 4] = Vec3(  67.11181569,  11.90420655,  23.93066789);
+    refforces[ 5] = Vec3(  46.43818572, -2.656719318,  -16.6533268);
+    refforces[ 6] = Vec3(  1.148644718, -1.286188095, -2.197644336);
+    refforces[ 7] = Vec3(  3.271506401, -2.741163255, -6.424493247);
+    refforces[ 8] = Vec3(  11.98064285, -47.37015871,  204.7405265);
+    refforces[ 9] = Vec3(  13.21490014, -12.64829193, -64.79338733);
+    refforces[10] = Vec3( -26.64553583,  2.987536952, -46.17432211);
+    refforces[11] = Vec3( -2.408006791,  62.23321534, -85.10156431);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+}
+
+
+void testWaterDimerEnergyAndForcesNoCutDirect() {
+    // Water box with isotropic induced dipoles
+    const double cutoff = 6.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
+    const double alpha = 0.0000001;
+    const int grid = 64;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+    System system;
+
+    const int numAtoms = 6;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system,
+                  do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setPolarizationType(MPIDForce::Direct);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy =-1.94994879;
+    vector<Vec3> refforces(6);
+    refforces[0] = Vec3( -138.7343779, -182.9753318,  35.71046477);
+    refforces[1] = Vec3(  37.11622609, -5.548622554,  5.042891784);
+    refforces[2] = Vec3(  41.13958524,  118.8298965,  31.47353836);
+    refforces[3] = Vec3( -116.4325593, -100.8665739, -27.61583588);
+    refforces[4] = Vec3(  126.6400299,  165.9005581, -19.33419202);
+    refforces[5] = Vec3(  50.27109605,   4.66007373, -25.27686701);
+
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+    //print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+}
+
+
 void testWaterDimerEnergyAndForcesPMEDirect() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
@@ -1149,7 +1356,13 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
 
     const int numAtoms = 6;
 
-    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system);
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system,
+                  do_charge, do_dpole, do_qpole, do_opole, do_pol);
     forceField->setNonbondedMethod(OpenMM::MPIDForce::PME);
     forceField->setPMEParameters(alpha, grid, grid, grid);
     forceField->setDefaultTholeWidth(3.0);
@@ -1181,6 +1394,53 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
 //    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
+void testWaterDimerEnergyAndForcesNoCutMutual() {
+    // Water box with isotropic induced dipoles
+    const double cutoff = 6.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+
+    System system;
+
+    const int numAtoms = 6;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system,
+                  do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setPolarizationType(MPIDForce::Mutual);
+    forceField->setMutualInducedTargetEpsilon(1e-8);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = -1.952963525;
+    vector<Vec3> refforces(6);
+    refforces[0] = Vec3( -139.7868825, -184.4381357,  35.63038201);
+    refforces[1] = Vec3(  37.43587059, -5.523034186,  5.116935643);
+    refforces[2] = Vec3(  41.23199187,   119.370244,  31.61776106);
+    refforces[3] = Vec3( -116.9503983, -101.4738732, -27.86496252);
+    refforces[4] = Vec3(  127.7739746,  167.4228526, -19.23056195);
+    refforces[5] = Vec3(  50.29544379,  4.641946497, -25.26955425);
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+}
 
 void testWaterDimerEnergyAndForcesPMEMutual() {
     // Water box with isotropic induced dipoles
@@ -1289,6 +1549,54 @@ void testWaterDimerEnergyAndForcesPMEExtrapolated() {
 }
 
 
+void testWaterDimerEnergyAndForcesNoCutExtrapolated() {
+    // Water box with isotropic induced dipoles
+    double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
+    MPIDForce* forceField = new MPIDForce();
+
+    vector<Vec3> positions;
+
+    System system;
+
+    const int numAtoms = 6;
+
+    bool do_charge = true;
+    bool do_dpole  = true;
+    bool do_qpole  = true;
+    bool do_opole  = true;
+    bool do_pol    = true;
+    make_waterbox(numAtoms, boxEdgeLength, forceField,  positions, system,
+                  do_charge, do_dpole, do_qpole, do_opole, do_pol);
+    forceField->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField->setDefaultTholeWidth(3.0);
+    forceField->setPolarizationType(MPIDForce::Extrapolated);
+    system.addForce(forceField);
+
+    VerletIntegrator integrator(0.01);
+    Context context(system, integrator, Platform::getPlatformByName("Reference"));
+    context.setPositions(positions);
+
+    double refenergy = -1.946731891;
+    vector<Vec3> refforces(6);
+    refforces[0] = Vec3( -139.8562318, -184.5612354,  35.69651068);
+    refforces[1] = Vec3(  37.47480195, -5.507298438,  5.113783803);
+    refforces[2] = Vec3(  41.24905782,  119.4378073,  31.61743454);
+    refforces[3] = Vec3( -117.0200105, -101.5556757, -27.86747799);
+    refforces[4] = Vec3(   127.884772,   167.562463, -19.27225997);
+    refforces[5] = Vec3(  50.26761055,  4.623939281, -25.28799106);
+
+    State state = context.getState(State::Forces | State::Energy);
+    double energy = state.getPotentialEnergy();
+    const vector<Vec3>& forces = state.getForces();
+//    print_energy_and_forces(energy, forces);
+    ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
+    for (int n = 0; n < numAtoms; ++n)
+        ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
+    check_finite_differences(forces, context, positions);
+//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+}
+
+
 int main(int numberOfArguments, char* argv[]) {
 
     try {
@@ -1296,11 +1604,17 @@ int main(int numberOfArguments, char* argv[]) {
         registerMPIDReferenceKernelFactories();
 
         testWaterDimerEnergyAndForcesPMEDirect();
+        testWaterDimerEnergyAndForcesNoCutDirect();
         testWaterDimerEnergyAndForcesPMEMutual();
+        testWaterDimerEnergyAndForcesNoCutMutual();
         testWaterDimerEnergyAndForcesPMEExtrapolated();
+        testWaterDimerEnergyAndForcesNoCutExtrapolated();
         testMethanolDimerEnergyAndForcesPMEExtrapolated();
+        testMethanolDimerEnergyAndForcesNoCutExtrapolated();
         testMethanolDimerEnergyAndForcesPMEDirect();
+        testMethanolDimerEnergyAndForcesNoCutDirect();
         testMethanolDimerEnergyAndForcesPMEMutual();
+        testMethanolDimerEnergyAndForcesNoCutMutual();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;

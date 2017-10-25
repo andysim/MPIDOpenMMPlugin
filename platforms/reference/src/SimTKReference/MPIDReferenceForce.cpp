@@ -802,7 +802,7 @@ void MPIDReferenceForce::applyRotationMatrix(vector<MultipoleParticleData>& part
     }
 }
 
-void MPIDReferenceForce::getAndScaleInverseRs(double dampI, double dampJ,
+void MPIDReferenceForce::getAndScaleInverseRs(double dampI, double dampJ, double pscale,
                                                          double tholeI, double tholeJ,
                                                          double r, vector<double>& rrI) const
 {
@@ -819,20 +819,19 @@ void MPIDReferenceForce::getAndScaleInverseRs(double dampI, double dampJ,
 
     double damp = dampI*dampJ;
     if (damp != 0.0) {
-        double pgamma    = tholeI < tholeJ ? tholeI : tholeJ;
-        double ratio     = (r/damp);
-               ratio     = ratio*ratio*ratio;
-               damp      = -pgamma*ratio;
+        double ratio   = (r/damp);
 
-        if (damp > -50.0) {
-            double dampExp = exp(damp);
-
-            rrI[0]              *= 1.0 - dampExp;
-            rrI[1]              *= 1.0 - (1.0 - damp)*dampExp;
-            if (rrI.size() > 2) {
-                rrI[2]          *= 1.0 - (1.0 - damp + (0.6*damp*damp))*dampExp;
-            }
-       }
+        double pgamma  = pscale == 0.0 ? tholeI + tholeJ : _defaultTholeWidth;
+               damp    = pgamma*ratio;
+        if (damp < 50.0) {
+            double expdamp = exp(-damp);
+            rrI[0] *= 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp);
+            rrI[1] *= 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0);
+            if(rrI.size()>2)
+                rrI[2] *= 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0 + damp*damp*damp*damp/30.0);
+            if(rrI.size()>3)
+                rrI[3] *= 1.0 - expdamp*(1.0 + damp + 0.5*damp*damp + damp*damp*damp/6.0 + 4.0*damp*damp*damp*damp/105.0 + damp*damp*damp*damp*damp/210.0);
+        }
     }
 }
 
@@ -847,15 +846,17 @@ void MPIDReferenceForce::calculateFixedMultipoleFieldPairIxn(const MultipolePart
     Vec3 deltaR = particleJ.position - particleI.position;
     double r = sqrt(deltaR.dot(deltaR));
 
-    vector<double> rrI(3);
+    vector<double> rrI(4);
 
     // get scaling factors, if needed
 
-    getAndScaleInverseRs(particleI.dampingFactor, particleJ.dampingFactor, particleI.thole, particleJ.thole, r, rrI);
+    getAndScaleInverseRs(particleI.dampingFactor, particleJ.dampingFactor, pScale, particleI.thole, particleJ.thole, r, rrI);
     double rr3    = rrI[0];
     double rr5    = rrI[1];
     double rr7    = rrI[2];
+    double rr9    = rrI[3];
     double rr5_2  = 2.0*rr5;
+    double rr7_3  = 3.0*rr7;
 
     // field at particle I due multipoles at particle J
 
@@ -863,28 +864,48 @@ void MPIDReferenceForce::calculateFixedMultipoleFieldPairIxn(const MultipolePart
     qDotDelta[0]                            = deltaR[0]*particleJ.quadrupole[QXX] + deltaR[1]*particleJ.quadrupole[QXY] + deltaR[2]*particleJ.quadrupole[QXZ];
     qDotDelta[1]                            = deltaR[0]*particleJ.quadrupole[QXY] + deltaR[1]*particleJ.quadrupole[QYY] + deltaR[2]*particleJ.quadrupole[QYZ];
     qDotDelta[2]                            = deltaR[0]*particleJ.quadrupole[QXZ] + deltaR[1]*particleJ.quadrupole[QYZ] + deltaR[2]*particleJ.quadrupole[QZZ];
+    Vec3 oxxJ        = Vec3(particleJ.octopole[QXXX], particleJ.octopole[QXXY], particleJ.octopole[QXXZ]);
+    Vec3 oxyJ        = Vec3(particleJ.octopole[QXXY], particleJ.octopole[QXYY], particleJ.octopole[QXYZ]);
+    Vec3 oxzJ        = Vec3(particleJ.octopole[QXXZ], particleJ.octopole[QXYZ], particleJ.octopole[QXZZ]);
+    Vec3 oyyJ        = Vec3(particleJ.octopole[QXYY], particleJ.octopole[QYYY], particleJ.octopole[QYYZ]);
+    Vec3 oyzJ        = Vec3(particleJ.octopole[QXYZ], particleJ.octopole[QYYZ], particleJ.octopole[QYZZ]);
+    Vec3 ozzJ        = Vec3(particleJ.octopole[QXZZ], particleJ.octopole[QYZZ], particleJ.octopole[QZZZ]);
+    Vec3 oxJ         = Vec3(oxxJ.dot(deltaR), oxyJ.dot(deltaR), oxzJ.dot(deltaR));
+    Vec3 oyJ         = Vec3(oxyJ.dot(deltaR), oyyJ.dot(deltaR), oyzJ.dot(deltaR));
+    Vec3 ozJ         = Vec3(oxzJ.dot(deltaR), oyzJ.dot(deltaR), ozzJ.dot(deltaR));
+    Vec3 oJ          = Vec3(oxJ.dot(deltaR), oyJ.dot(deltaR), ozJ.dot(deltaR));
 
     double dipoleDelta                      = particleJ.dipole.dot(deltaR);
     double qdpoleDelta                      = qDotDelta.dot(deltaR);
-    double factor                           = rr3*particleJ.charge - rr5*dipoleDelta + rr7*qdpoleDelta;
+    double factor                           = rr3*particleJ.charge - rr5*dipoleDelta + rr7*qdpoleDelta - rr9*oJ.dot(deltaR);
 
-    Vec3 field                              = deltaR*factor + particleJ.dipole*rr3 - qDotDelta*rr5_2;
-
-    unsigned int particleIndex                = particleI.particleIndex;
-    _fixedMultipoleField[particleIndex]      -= field*dScale;
+    Vec3 field                              = deltaR*factor + particleJ.dipole*rr3 - qDotDelta*rr5_2 + oJ*rr7_3;
+    unsigned int particleIndex              = particleI.particleIndex;
+    _fixedMultipoleField[particleIndex]    -= field*dScale;
 
     // field at particle J due multipoles at particle I
 
     qDotDelta[0]                              = deltaR[0]*particleI.quadrupole[QXX] + deltaR[1]*particleI.quadrupole[QXY] + deltaR[2]*particleI.quadrupole[QXZ];
     qDotDelta[1]                              = deltaR[0]*particleI.quadrupole[QXY] + deltaR[1]*particleI.quadrupole[QYY] + deltaR[2]*particleI.quadrupole[QYZ];
     qDotDelta[2]                              = deltaR[0]*particleI.quadrupole[QXZ] + deltaR[1]*particleI.quadrupole[QYZ] + deltaR[2]*particleI.quadrupole[QZZ];
+    Vec3 oxxI        = Vec3(particleI.octopole[QXXX], particleI.octopole[QXXY], particleI.octopole[QXXZ]);
+    Vec3 oxyI        = Vec3(particleI.octopole[QXXY], particleI.octopole[QXYY], particleI.octopole[QXYZ]);
+    Vec3 oxzI        = Vec3(particleI.octopole[QXXZ], particleI.octopole[QXYZ], particleI.octopole[QXZZ]);
+    Vec3 oyyI        = Vec3(particleI.octopole[QXYY], particleI.octopole[QYYY], particleI.octopole[QYYZ]);
+    Vec3 oyzI        = Vec3(particleI.octopole[QXYZ], particleI.octopole[QYYZ], particleI.octopole[QYZZ]);
+    Vec3 ozzI        = Vec3(particleI.octopole[QXZZ], particleI.octopole[QYZZ], particleI.octopole[QZZZ]);
+    Vec3 oxI         = Vec3(oxxI.dot(deltaR), oxyI.dot(deltaR), oxzI.dot(deltaR));
+    Vec3 oyI         = Vec3(oxyI.dot(deltaR), oyyI.dot(deltaR), oyzI.dot(deltaR));
+    Vec3 ozI         = Vec3(oxzI.dot(deltaR), oyzI.dot(deltaR), ozzI.dot(deltaR));
+    Vec3 oI          = Vec3(oxI.dot(deltaR), oyI.dot(deltaR), ozI.dot(deltaR));
 
     dipoleDelta                               = particleI.dipole.dot(deltaR);
     qdpoleDelta                               = qDotDelta.dot(deltaR);
-    factor                                    = rr3*particleI.charge + rr5*dipoleDelta + rr7*qdpoleDelta;
+    factor                                    = rr3*particleI.charge + rr5*dipoleDelta + rr7*qdpoleDelta + rr9*oI.dot(deltaR);
 
-    field                                     = deltaR*factor - particleI.dipole*rr3 - qDotDelta*rr5_2;
+    field                                     = deltaR*factor - particleI.dipole*rr3 - qDotDelta*rr5_2 - oI*rr7_3;
     particleIndex                             = particleJ.particleIndex;
+
     _fixedMultipoleField[particleIndex]      += field*dScale;
 }
 
@@ -954,8 +975,9 @@ void MPIDReferenceForce::calculateInducedDipolePairIxns(const MultipoleParticleD
     // If we're using the extrapolation algorithm, we need to compute the field gradient, so ask for one more rrI value.
     if (getPolarizationType() == MPIDReferenceForce::Extrapolated)
         rrI.push_back(0.0);
-  
-    getAndScaleInverseRs(particleI.dampingFactor, particleJ.dampingFactor,
+
+    double pscale = getMultipoleScaleFactor(particleI.particleIndex, particleJ.particleIndex, P_SCALE);
+    getAndScaleInverseRs(particleI.dampingFactor, particleJ.dampingFactor, pscale,
                           particleI.thole, particleJ.thole, r, rrI);
 
     double rr3       = -rrI[0];
@@ -1308,24 +1330,26 @@ void MPIDReferenceForce::calculateInducedDipoles(const vector<MultipoleParticleD
 }
 
 double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticleData& particleI,
-                                                                        const MultipoleParticleData& particleK,
+                                                                        const MultipoleParticleData& particleJ,
                                                                         const vector<double>& scalingFactors,
                                                                         vector<Vec3>& forces,
                                                                         vector<Vec3>& torque) const
 {
     unsigned int iIndex = particleI.particleIndex;
-    unsigned int kIndex = particleK.particleIndex;
+    unsigned int jIndex = particleJ.particleIndex;
 
-    Vec3 deltaR = particleK.position - particleI.position;
+    Vec3 deltaR = particleJ.position - particleI.position;
     double r2 = deltaR.dot(deltaR);
     double r = sqrt(r2);
 
     // Start by constructing rotation matrices to put dipoles and
     // quadrupoles into the QI frame, from the lab frame.
     double qiRotationMatrix1[3][3];
-    formQIRotationMatrix(particleI.position, particleK.position, deltaR, r, qiRotationMatrix1);
+    formQIRotationMatrix(particleI.position, particleJ.position, deltaR, r, qiRotationMatrix1);
     double qiRotationMatrix2[5][5];
     buildSphericalQuadrupoleRotationMatrix(qiRotationMatrix1, qiRotationMatrix2);
+    double qiRotationMatrix3[7][7];
+    buildSphericalOctopoleRotationMatrix(qiRotationMatrix1, qiRotationMatrix2, qiRotationMatrix3);
     // The force rotation matrix rotates the QI forces into the lab
     // frame, and makes sure the result is in {x,y,z} ordering. Its
     // transpose is used to rotate the induced dipoles to the QI frame.
@@ -1355,62 +1379,83 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     inducedDipoleRotationMatrix[2][2] = 0.5*qiRotationMatrix1[2][0];
 
     // Rotate the induced dipoles to the QI frame.
-    double qiUindI[3], qiUindJ[3], qiUinpI[3], qiUinpJ[3];
+    double qiUindI[3], qiUindJ[3];
     for (int ii = 0; ii < 3; ii++) {
-        double valIP = 0.0;
         double valID = 0.0;
-        double valJP = 0.0;
         double valJD = 0.0;
         for (int jj = 0; jj < 3; jj++) {
             valID += inducedDipoleRotationMatrix[ii][jj] * _inducedDipole[iIndex][jj];
-            valJD += inducedDipoleRotationMatrix[ii][jj] * _inducedDipole[kIndex][jj];
+            valJD += inducedDipoleRotationMatrix[ii][jj] * _inducedDipole[jIndex][jj];
         }
         qiUindI[ii] = valID;
-        qiUinpI[ii] = valIP;
         qiUindJ[ii] = valJD;
-        qiUinpJ[ii] = valJP;
     }
 
     // The Qtilde intermediates (QI frame multipoles) for atoms I and J
-    double qiQI[9], qiQJ[9];
+    double qiQI[16], qiQJ[16];
     // Rotate the permanent multipoles to the QI frame.
     qiQI[0] = particleI.charge;
-    qiQJ[0] = particleK.charge;
+    qiQJ[0] = particleJ.charge;
     for (int ii = 0; ii < 3; ii++) {
         double valI = 0.0;
         double valJ = 0.0;
         for (int jj = 0; jj < 3; jj++) {
             valI += qiRotationMatrix1[ii][jj] * particleI.sphericalDipole[jj];
-            valJ += qiRotationMatrix1[ii][jj] * particleK.sphericalDipole[jj];
+            valJ += qiRotationMatrix1[ii][jj] * particleJ.sphericalDipole[jj];
         }
         qiQI[ii+1] = valI;
         qiQJ[ii+1] = valJ;
     }
+
     for (int ii = 0; ii < 5; ii++) {
         double valI = 0.0;
         double valJ = 0.0;
         for (int jj = 0; jj < 5; jj++) {
             valI += qiRotationMatrix2[ii][jj] * particleI.sphericalQuadrupole[jj];
-            valJ += qiRotationMatrix2[ii][jj] * particleK.sphericalQuadrupole[jj];
+            valJ += qiRotationMatrix2[ii][jj] * particleJ.sphericalQuadrupole[jj];
         }
         qiQI[ii+4] = valI;
         qiQJ[ii+4] = valJ;
     }
 
+    for (int ii = 0; ii < 7; ii++) {
+        double valI = 0.0;
+        double valJ = 0.0;
+        for (int jj = 0; jj < 7; jj++) {
+            valI += qiRotationMatrix3[ii][jj] * particleI.sphericalOctopole[jj];
+            valJ += qiRotationMatrix3[ii][jj] * particleJ.sphericalOctopole[jj];
+        }
+        qiQI[ii+9] = valI;
+        qiQJ[ii+9] = valJ;
+    }
+
     // The Qtilde{x,y,z} torque intermediates for atoms I and J, which are used to obtain the torques on the permanent moments.
-    double qiQIX[9] = {0.0, qiQI[3], 0.0, -qiQI[1], sqrtThree*qiQI[6], qiQI[8], -sqrtThree*qiQI[4] - qiQI[7], qiQI[6], -qiQI[5]};
-    double qiQIY[9] = {0.0, -qiQI[2], qiQI[1], 0.0, -sqrtThree*qiQI[5], sqrtThree*qiQI[4] - qiQI[7], -qiQI[8], qiQI[5], qiQI[6]};
-    double qiQIZ[9] = {0.0, 0.0, -qiQI[3], qiQI[2], 0.0, -qiQI[6], qiQI[5], -2.0*qiQI[8], 2.0*qiQI[7]};
-    double qiQJX[9] = {0.0, qiQJ[3], 0.0, -qiQJ[1], sqrtThree*qiQJ[6], qiQJ[8], -sqrtThree*qiQJ[4] - qiQJ[7], qiQJ[6], -qiQJ[5]};
-    double qiQJY[9] = {0.0, -qiQJ[2], qiQJ[1], 0.0, -sqrtThree*qiQJ[5], sqrtThree*qiQJ[4] - qiQJ[7], -qiQJ[8], qiQJ[5], qiQJ[6]};
-    double qiQJZ[9] = {0.0, 0.0, -qiQJ[3], qiQJ[2], 0.0, -qiQJ[6], qiQJ[5], -2.0*qiQJ[8], 2.0*qiQJ[7]};
+    // 0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
+    // q    10  11c  11s   20  21c  21s  22c  22s  30   31c  31s  32c  32s  33c  33s
+    double qiQIX[16] = {0.0, qiQI[3], 0.0, -qiQI[1], sqrtThree*qiQI[6], qiQI[8], -sqrtThree*qiQI[4] - qiQI[7], qiQI[6], -qiQI[5],
+                        sqrtSix*qiQI[11], sqrtFiveHalves*qiQI[13], -sqrtSix*qiQI[9]-sqrtFiveHalves*qiQI[12],sqrtFiveHalves*qiQI[11]+sqrtThreeHalves*qiQI[15],
+                        -sqrtFiveHalves*qiQI[10]-sqrtThreeHalves*qiQI[14], sqrtThreeHalves*qiQI[13], -sqrtThreeHalves*qiQI[12]};
+    double qiQIY[16] = {0.0, -qiQI[2], qiQI[1], 0.0, -sqrtThree*qiQI[5], sqrtThree*qiQI[4] - qiQI[7], -qiQI[8], qiQI[5], qiQI[6],
+                        -sqrtSix*qiQI[10], sqrtSix*qiQI[9]-sqrtFiveHalves*qiQI[12], -sqrtFiveHalves*qiQI[13], sqrtFiveHalves*qiQI[10]-sqrtThreeHalves*qiQI[14],
+                        sqrtFiveHalves*qiQI[11]-sqrtThreeHalves*qiQI[15], sqrtThreeHalves*qiQI[12], sqrtThreeHalves*qiQI[13]};
+    double qiQIZ[16] = {0.0, 0.0, -qiQI[3], qiQI[2], 0.0, -qiQI[6], qiQI[5], -2.0*qiQI[8], 2.0*qiQI[7],
+                        0.0, -qiQI[11], qiQI[10], -2.0*qiQI[13], 2.0*qiQI[12], -3.0*qiQI[15], 3.0*qiQI[14]};
+    double qiQJX[16] = {0.0, qiQJ[3], 0.0, -qiQJ[1], sqrtThree*qiQJ[6], qiQJ[8], -sqrtThree*qiQJ[4] - qiQJ[7], qiQJ[6], -qiQJ[5],
+                        sqrtSix*qiQJ[11], sqrtFiveHalves*qiQJ[13], -sqrtSix*qiQJ[9]-sqrtFiveHalves*qiQJ[12],sqrtFiveHalves*qiQJ[11]+sqrtThreeHalves*qiQJ[15],
+                        -sqrtFiveHalves*qiQJ[10]-sqrtThreeHalves*qiQJ[14], sqrtThreeHalves*qiQJ[13], -sqrtThreeHalves*qiQJ[12]};
+    double qiQJY[16] = {0.0, -qiQJ[2], qiQJ[1], 0.0, -sqrtThree*qiQJ[5], sqrtThree*qiQJ[4] - qiQJ[7], -qiQJ[8], qiQJ[5], qiQJ[6],
+                        -sqrtSix*qiQJ[10], sqrtSix*qiQJ[9]-sqrtFiveHalves*qiQJ[12], -sqrtFiveHalves*qiQJ[13], sqrtFiveHalves*qiQJ[10]-sqrtThreeHalves*qiQJ[14],
+                        sqrtFiveHalves*qiQJ[11]-sqrtThreeHalves*qiQJ[15], sqrtThreeHalves*qiQJ[12], sqrtThreeHalves*qiQJ[13]};
+    double qiQJZ[16] = {0.0, 0.0, -qiQJ[3], qiQJ[2], 0.0, -qiQJ[6], qiQJ[5], -2.0*qiQJ[8], 2.0*qiQJ[7],
+                        0.0, -qiQJ[11], qiQJ[10], -2.0*qiQJ[13], 2.0*qiQJ[12], -3.0*qiQJ[15], 3.0*qiQJ[14]};
+
 
     // The field derivatives at I due to permanent and induced moments on J, and vice-versa.
     // Also, their derivatives w.r.t. R, which are needed for force calculations
-    double Vij[9], Vji[9], VjiR[9], VijR[9];
+    double Vij[16], Vji[16], VjiR[16], VijR[16];
     // The field derivatives at I due to only permanent moments on J, and vice-versa.
-    double Vijp[3], Vijd[3], Vjip[3], Vjid[3];
-    double rInvVec[7];
+    double Vijd[3], Vjid[3];
+    double rInvVec[9];
 
     double prefac = (_electric/_dielectric);
     double rInv = 1.0 / r;
@@ -1418,7 +1463,7 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     // The rInvVec array is defined such that the ith element is R^-i, with the
     // dieleectric constant folded in, to avoid conversions later.
     rInvVec[1] = prefac * rInv;
-    for (int i = 2; i < 7; ++i)
+    for (int i = 2; i < 9; ++i)
         rInvVec[i] = rInvVec[i-1] * rInv;
 
     double mScale = scalingFactors[M_SCALE];
@@ -1426,32 +1471,38 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     double dScale = pScale;
     double uScale = 1.0;
 
-    double dmp = particleI.dampingFactor*particleK.dampingFactor;
-    double a = particleI.thole < particleK.thole ? particleI.thole : particleK.thole;
+    double dmp = particleI.dampingFactor*particleJ.dampingFactor;
+    double a = pScale == 0.0 ? particleI.thole + particleJ.thole : _defaultTholeWidth;
     double u = std::abs(dmp) > 1.0E-5 ? r/dmp : 1E10;
-    double au3 = a*u*u*u;
-    double expau3 = au3 < 50.0 ? exp(-au3) : 0.0;
-    double a2u6 = au3*au3;
-    double a3u9 = a2u6*au3;
+    double au = a*u;
+    double expau = au < 50.0 ? exp(-au) : 0.0;
+    double au2 = au*au;
+    double au3 = au2*au;
+    double au4 = au3*au;
+    double au5 = au4*au;
+    double au6 = au5*au;
     // Thole damping factors for energies
-    double thole_c  = 1.0 - expau3;
-    double thole_d0 = 1.0 - expau3*(1.0 + 1.5*au3);
-    double thole_d1 = 1.0 - expau3;
-    double thole_q0 = 1.0 - expau3*(1.0 + au3 + a2u6);
-    double thole_q1 = 1.0 - expau3*(1.0 + au3);
+    double thole_c   = 1.0 - expau*(1.0 + au + 0.5*au2);
+    double thole_d0  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/4.0);
+    double thole_d1  = 1.0 - expau*(1.0 + au + 0.5*au2);
+    double thole_q0  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/18.0);
+    double thole_q1  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0);
+    double thole_o0  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0 + au5/120.0);
+    double thole_o1  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/30.0);
     // Thole damping factors for derivatives
-    double dthole_c  = 1.0 - expau3*(1.0 + 1.5*au3);
-    double dthole_d0 = 1.0 - expau3*(1.0 + au3 + 1.5*a2u6);
-    double dthole_d1 = 1.0 - expau3*(1.0 + au3);
-    double dthole_q0 = 1.0 - expau3*(1.0 + au3 + 0.25*a2u6 + 0.75*a3u9);
-    double dthole_q1 = 1.0 - expau3*(1.0 + au3 + 0.75*a2u6);
-
+    double dthole_c  = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/4.0);
+    double dthole_d0 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/12.0);
+    double dthole_d1 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0);
+    double dthole_q0 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0 + au5/72.0);
+    double dthole_q1 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0);
+    double dthole_o0 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/24.0 + au5/120.0 + au6/600.0);
+    double dthole_o1 = 1.0 - expau*(1.0 + au + 0.5*au2 + au3/6.0 + au4/25.0 + au5/150.0);
     // Now we compute the (attenuated) Coulomb operator and its derivatives, contracted with
     // permanent moments and induced dipoles.  Note that the coefficient of the permanent force
     // terms is half of the expected value; this is because we compute the interaction of I with
     // the sum of induced and permanent moments on J, as well as the interaction of J with I's
     // permanent and induced moments; doing so double counts the permanent-permanent interaction.
-    double ePermCoef, dPermCoef, eUIndCoef, dUIndCoef, eUInpCoef, dUInpCoef;
+    double ePermCoef, dPermCoef, eUindCoef, dUindCoef;
 
     // C-C terms (m=0)
     ePermCoef = rInvVec[1]*mScale;
@@ -1463,63 +1514,49 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
 
     // C-D and C-Uind terms (m=0)
     ePermCoef = rInvVec[2]*mScale;
-    eUIndCoef = rInvVec[2]*pScale*thole_c;
-    eUInpCoef = rInvVec[2]*dScale*thole_c;
+    eUindCoef = 2.0*rInvVec[2]*pScale*thole_c;
     dPermCoef = -rInvVec[3]*mScale;
-    dUIndCoef = -2.0*rInvVec[3]*pScale*dthole_c;
-    dUInpCoef = -2.0*rInvVec[3]*dScale*dthole_c;
-    Vij[0]  += -(ePermCoef*qiQJ[1] + eUIndCoef*qiUindJ[0] + eUInpCoef*qiUinpJ[0]);
+    dUindCoef = -4.0*rInvVec[3]*dScale*dthole_c;
+    Vij[0]  += -(ePermCoef*qiQJ[1] + eUindCoef*qiUindJ[0]);
     Vji[1]   = -(ePermCoef*qiQI[0]);
-    VijR[0] += -(dPermCoef*qiQJ[1] + dUIndCoef*qiUindJ[0] + dUInpCoef*qiUinpJ[0]);
+    VijR[0] += -(dPermCoef*qiQJ[1] + dUindCoef*qiUindJ[0]);
     VjiR[1]  = -(dPermCoef*qiQI[0]);
-    Vjip[0]  = -(eUInpCoef*qiQI[0]);
-    Vjid[0]  = -(eUIndCoef*qiQI[0]);
+    Vjid[0]  = -(eUindCoef*qiQI[0]);
     // D-C and Uind-C terms (m=0)
     Vij[1]   = ePermCoef*qiQJ[0];
-    Vji[0]  += ePermCoef*qiQI[1] + eUIndCoef*qiUindI[0] + eUInpCoef*qiUinpI[0];
+    Vji[0]  += ePermCoef*qiQI[1] + eUindCoef*qiUindI[0];
     VijR[1]  = dPermCoef*qiQJ[0];
-    VjiR[0] += dPermCoef*qiQI[1] + dUIndCoef*qiUindI[0] + dUInpCoef*qiUinpI[0];
-    Vijp[0]  = eUInpCoef*qiQJ[0];
-    Vijd[0]  = eUIndCoef*qiQJ[0];
+    VjiR[0] += dPermCoef*qiQI[1] + dUindCoef*qiUindI[0];
+    Vijd[0]  = eUindCoef*qiQJ[0];
 
     // D-D and D-Uind terms (m=0)
     ePermCoef = -2.0*rInvVec[3]*mScale;
-    eUIndCoef = -2.0*rInvVec[3]*pScale*thole_d0;
-    eUInpCoef = -2.0*rInvVec[3]*dScale*thole_d0;
-    dPermCoef = 3.0*rInvVec[4]*mScale;
-    dUIndCoef = 6.0*rInvVec[4]*pScale*dthole_d0;
-    dUInpCoef = 6.0*rInvVec[4]*dScale*dthole_d0;
-    Vij[1]  += ePermCoef*qiQJ[1] + eUIndCoef*qiUindJ[0] + eUInpCoef*qiUinpJ[0];
-    Vji[1]  += ePermCoef*qiQI[1] + eUIndCoef*qiUindI[0] + eUInpCoef*qiUinpI[0];
-    VijR[1] += dPermCoef*qiQJ[1] + dUIndCoef*qiUindJ[0] + dUInpCoef*qiUinpJ[0];
-    VjiR[1] += dPermCoef*qiQI[1] + dUIndCoef*qiUindI[0] + dUInpCoef*qiUinpI[0];
-    Vijp[0] += eUInpCoef*qiQJ[1];
-    Vijd[0] += eUIndCoef*qiQJ[1];
-    Vjip[0] += eUInpCoef*qiQI[1];
-    Vjid[0] += eUIndCoef*qiQI[1];
+    eUindCoef = -4.0*rInvVec[3]*dScale*thole_d0;
+    dPermCoef = rInvVec[4]*3.0*mScale;
+    dUindCoef = 12.0*rInvVec[4]*dScale*dthole_d0;
+    Vij[1]  += ePermCoef*qiQJ[1] + eUindCoef*qiUindJ[0];
+    Vji[1]  += ePermCoef*qiQI[1] + eUindCoef*qiUindI[0];
+    VijR[1] += dPermCoef*qiQJ[1] + dUindCoef*qiUindJ[0];
+    VjiR[1] += dPermCoef*qiQI[1] + dUindCoef*qiUindI[0];
+    Vijd[0] += eUindCoef*qiQJ[1];
+    Vjid[0] += eUindCoef*qiQI[1];
     // D-D and D-Uind terms (m=1)
     ePermCoef = rInvVec[3]*mScale;
-    eUIndCoef = rInvVec[3]*pScale*thole_d1;
-    eUInpCoef = rInvVec[3]*dScale*thole_d1;
+    eUindCoef = 2.0*rInvVec[3]*dScale*thole_d1;
     dPermCoef = -1.5*rInvVec[4]*mScale;
-    dUIndCoef = -3.0*rInvVec[4]*pScale*dthole_d1;
-    dUInpCoef = -3.0*rInvVec[4]*dScale*dthole_d1;
-    Vij[2]  = ePermCoef*qiQJ[2] + eUIndCoef*qiUindJ[1] + eUInpCoef*qiUinpJ[1];
-    Vji[2]  = ePermCoef*qiQI[2] + eUIndCoef*qiUindI[1] + eUInpCoef*qiUinpI[1];
-    VijR[2] = dPermCoef*qiQJ[2] + dUIndCoef*qiUindJ[1] + dUInpCoef*qiUinpJ[1];
-    VjiR[2] = dPermCoef*qiQI[2] + dUIndCoef*qiUindI[1] + dUInpCoef*qiUinpI[1];
-    Vij[3]  = ePermCoef*qiQJ[3] + eUIndCoef*qiUindJ[2] + eUInpCoef*qiUinpJ[2];
-    Vji[3]  = ePermCoef*qiQI[3] + eUIndCoef*qiUindI[2] + eUInpCoef*qiUinpI[2];
-    VijR[3] = dPermCoef*qiQJ[3] + dUIndCoef*qiUindJ[2] + dUInpCoef*qiUinpJ[2];
-    VjiR[3] = dPermCoef*qiQI[3] + dUIndCoef*qiUindI[2] + dUInpCoef*qiUinpI[2];
-    Vijp[1] = eUInpCoef*qiQJ[2];
-    Vijd[1] = eUIndCoef*qiQJ[2];
-    Vjip[1] = eUInpCoef*qiQI[2];
-    Vjid[1] = eUIndCoef*qiQI[2];
-    Vijp[2] = eUInpCoef*qiQJ[3];
-    Vijd[2] = eUIndCoef*qiQJ[3];
-    Vjip[2] = eUInpCoef*qiQI[3];
-    Vjid[2] = eUIndCoef*qiQI[3];
+    dUindCoef = -6.0*rInvVec[4]*dScale*dthole_d1;
+    Vij[2]  = ePermCoef*qiQJ[2] + eUindCoef*qiUindJ[1];
+    Vji[2]  = ePermCoef*qiQI[2] + eUindCoef*qiUindI[1];
+    VijR[2] = dPermCoef*qiQJ[2] + dUindCoef*qiUindJ[1];
+    VjiR[2] = dPermCoef*qiQI[2] + dUindCoef*qiUindI[1];
+    Vij[3]  = ePermCoef*qiQJ[3] + eUindCoef*qiUindJ[2];
+    Vji[3]  = ePermCoef*qiQI[3] + eUindCoef*qiUindI[2];
+    VijR[3] = dPermCoef*qiQJ[3] + dUindCoef*qiUindJ[2];
+    VjiR[3] = dPermCoef*qiQI[3] + dUindCoef*qiUindI[2];
+    Vijd[1] = eUindCoef*qiQJ[2];
+    Vjid[1] = eUindCoef*qiQI[2];
+    Vijd[2] = eUindCoef*qiQJ[3];
+    Vjid[2] = eUindCoef*qiQI[3];
 
     // C-Q terms (m=0)
     ePermCoef = mScale*rInvVec[3];
@@ -1535,58 +1572,48 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     VjiR[0] += dPermCoef*qiQI[4];
 
     // D-Q and Uind-Q terms (m=0)
-    ePermCoef = rInvVec[4]*3.0*mScale;
-    eUIndCoef = rInvVec[4]*3.0*pScale*thole_q0;
-    eUInpCoef = rInvVec[4]*3.0*dScale*thole_q0;
+    ePermCoef = 3.0*rInvVec[4]*mScale;
+    eUindCoef = 6.0*rInvVec[4]*dScale*thole_q0;
     dPermCoef = -6.0*rInvVec[5]*mScale;
-    dUIndCoef = -12.0*rInvVec[5]*pScale*dthole_q0;
-    dUInpCoef = -12.0*rInvVec[5]*dScale*dthole_q0;
+    dUindCoef = -24.0*rInvVec[5]*dScale*dthole_q0;
     Vij[1]  += ePermCoef*qiQJ[4];
-    Vji[4]  += ePermCoef*qiQI[1] + eUIndCoef*qiUindI[0] + eUInpCoef*qiUinpI[0];
+    Vji[4]  += ePermCoef*qiQI[1] + eUindCoef*qiUindI[0];
     VijR[1] += dPermCoef*qiQJ[4];
-    VjiR[4] += dPermCoef*qiQI[1] + dUIndCoef*qiUindI[0] + dUInpCoef*qiUinpI[0];
-    Vijp[0] += eUInpCoef*qiQJ[4];
-    Vijd[0] += eUIndCoef*qiQJ[4];
+    VjiR[4] += dPermCoef*qiQI[1] + dUindCoef*qiUindI[0];
+    Vijd[0] += eUindCoef*qiQJ[4];
     // Q-D and Q-Uind terms (m=0)
-    Vij[4]  += -(ePermCoef*qiQJ[1] + eUIndCoef*qiUindJ[0] + eUInpCoef*qiUinpJ[0]);
+    Vij[4]  += -(ePermCoef*qiQJ[1] + eUindCoef*qiUindJ[0]);
     Vji[1]  += -(ePermCoef*qiQI[4]);
-    VijR[4] += -(dPermCoef*qiQJ[1] + dUIndCoef*qiUindJ[0] + dUInpCoef*qiUinpJ[0]);
+    VijR[4] += -(dPermCoef*qiQJ[1] + dUindCoef*qiUindJ[0]);
     VjiR[1] += -(dPermCoef*qiQI[4]);
-    Vjip[0] += -(eUInpCoef*qiQI[4]);
-    Vjid[0] += -(eUIndCoef*qiQI[4]);
+    Vjid[0] += -(eUindCoef*qiQI[4]);
 
     // D-Q and Uind-Q terms (m=1)
     ePermCoef = -sqrtThree*rInvVec[4]*mScale;
-    eUIndCoef = -sqrtThree*rInvVec[4]*pScale*thole_q1;
-    eUInpCoef = -sqrtThree*rInvVec[4]*dScale*thole_q1;
+    eUindCoef = -2.0*sqrtThree*rInvVec[4]*pScale*thole_q1;
     dPermCoef = 2.0*sqrtThree*rInvVec[5]*mScale;
-    dUIndCoef = 4.0*sqrtThree*rInvVec[5]*pScale*dthole_q1;
-    dUInpCoef = 4.0*sqrtThree*rInvVec[5]*dScale*dthole_q1;
+    dUindCoef = 8.0*sqrtThree*rInvVec[5]*dScale*dthole_q1;
     Vij[2]  += ePermCoef*qiQJ[5];
-    Vji[5]   = ePermCoef*qiQI[2] + eUIndCoef*qiUindI[1] + eUInpCoef*qiUinpI[1];
+    Vji[5]   = ePermCoef*qiQI[2] + eUindCoef*qiUindI[1];
     VijR[2] += dPermCoef*qiQJ[5];
-    VjiR[5]  = dPermCoef*qiQI[2] + dUIndCoef*qiUindI[1] + dUInpCoef*qiUinpI[1];
+    VjiR[5]  = dPermCoef*qiQI[2] + dUindCoef*qiUindI[1];
     Vij[3]  += ePermCoef*qiQJ[6];
-    Vji[6]   = ePermCoef*qiQI[3] + eUIndCoef*qiUindI[2] + eUInpCoef*qiUinpI[2];
+    Vji[6]   = ePermCoef*qiQI[3] + eUindCoef*qiUindI[2];
     VijR[3] += dPermCoef*qiQJ[6];
-    VjiR[6]  = dPermCoef*qiQI[3] + dUIndCoef*qiUindI[2] + dUInpCoef*qiUinpI[2];
-    Vijp[1] += eUInpCoef*qiQJ[5];
-    Vijd[1] += eUIndCoef*qiQJ[5];
-    Vijp[2] += eUInpCoef*qiQJ[6];
-    Vijd[2] += eUIndCoef*qiQJ[6];
+    VjiR[6]  = dPermCoef*qiQI[3] + dUindCoef*qiUindI[2];
+    Vijd[1] += eUindCoef*qiQJ[5];
+    Vijd[2] += eUindCoef*qiQJ[6];
     // D-Q and Uind-Q terms (m=1)
-    Vij[5]   = -(ePermCoef*qiQJ[2] + eUIndCoef*qiUindJ[1] + eUInpCoef*qiUinpJ[1]);
+    Vij[5]   = -(ePermCoef*qiQJ[2] + eUindCoef*qiUindJ[1]);
     Vji[2]  += -(ePermCoef*qiQI[5]);
-    VijR[5]  = -(dPermCoef*qiQJ[2] + dUIndCoef*qiUindJ[1] + dUInpCoef*qiUinpJ[1]);
+    VijR[5]  = -(dPermCoef*qiQJ[2] + dUindCoef*qiUindJ[1]);
     VjiR[2] += -(dPermCoef*qiQI[5]);
-    Vij[6]   = -(ePermCoef*qiQJ[3] + eUIndCoef*qiUindJ[2] + eUInpCoef*qiUinpJ[2]);
+    Vij[6]   = -(ePermCoef*qiQJ[3] + eUindCoef*qiUindJ[2]);
     Vji[3]  += -(ePermCoef*qiQI[6]);
-    VijR[6]  = -(dPermCoef*qiQJ[3] + dUIndCoef*qiUindJ[2] + dUInpCoef*qiUinpJ[2]);
+    VijR[6]  = -(dPermCoef*qiQJ[3] + dUindCoef*qiUindJ[2]);
     VjiR[3] += -(dPermCoef*qiQI[6]);
-    Vjip[1] += -(eUInpCoef*qiQI[5]);
-    Vjid[1] += -(eUIndCoef*qiQI[5]);
-    Vjip[2] += -(eUInpCoef*qiQI[6]);
-    Vjid[2] += -(eUIndCoef*qiQI[6]);
+    Vjid[1] += -(eUindCoef*qiQI[5]);
+    Vjid[2] += -(eUindCoef*qiQI[6]);
 
     // Q-Q terms (m=0)
     ePermCoef = 6.0*rInvVec[5]*mScale;
@@ -1618,13 +1645,163 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     VijR[8] = dPermCoef*qiQJ[8];
     VjiR[8] = dPermCoef*qiQI[8];
 
+    // C-O (m=0)
+    ePermCoef = -rInvVec[4]*mScale;
+    dPermCoef = 2.0*rInvVec[5]*mScale;
+    Vij[0]  += ePermCoef*qiQJ[9];
+    Vji[9]   = ePermCoef*qiQI[0];
+    VijR[0] += dPermCoef*qiQJ[9];
+    VjiR[9]  = dPermCoef*qiQI[0];
+    // O-C (m=0)
+    Vij[9]   = -ePermCoef*qiQJ[0];
+    Vji[0]  -=  ePermCoef*qiQI[9];
+    VijR[9]  = -dPermCoef*qiQJ[0];
+    VjiR[0] -=  dPermCoef*qiQI[9];
+
+    // D-O and Uind-O (m=0)
+    ePermCoef = -4.0*rInvVec[5]*mScale;
+    eUindCoef = -8.0*rInvVec[5]*dScale*thole_o0;
+    dPermCoef = 10.0*rInvVec[6]*mScale;
+    dUindCoef = 40.0*rInvVec[6]*dScale*dthole_o0;
+    Vij[1]  += ePermCoef*qiQJ[9];
+    Vji[9]  += ePermCoef*qiQI[1] + eUindCoef*qiUindI[0];
+    VijR[1] += dPermCoef*qiQJ[9];
+    VjiR[9] += dPermCoef*qiQI[1] + dUindCoef*qiUindI[0];
+    // O-D and O-Uind (m=0)
+    Vij[9]  += ePermCoef*qiQJ[1] + eUindCoef*qiUindJ[0];
+    Vji[1]  += ePermCoef*qiQI[9];
+    VijR[9] += dPermCoef*qiQJ[1] + dUindCoef*qiUindJ[0];
+    VjiR[1] += dPermCoef*qiQI[9];
+    Vijd[0] += eUindCoef*qiQJ[9];
+    Vjid[0] += eUindCoef*qiQI[9];
+    // D-O and O-Uind (m=1)
+    ePermCoef = sqrtSix*rInvVec[5]*mScale;
+    eUindCoef = 2.0*sqrtSix*rInvVec[5]*dScale*thole_o1;
+    dPermCoef = -2.5*sqrtSix*rInvVec[6]*mScale;
+    dUindCoef = -10.0*sqrtSix*rInvVec[6]*dScale*dthole_o1;
+    Vij[2]   += ePermCoef*qiQJ[10];
+    Vji[10]   = ePermCoef*qiQI[2] + eUindCoef*qiUindI[1];
+    VijR[2]  += dPermCoef*qiQJ[10];
+    VjiR[10]  = dPermCoef*qiQI[2] + dUindCoef*qiUindI[1];
+    Vij[3]   += ePermCoef*qiQJ[11];
+    Vji[11]   = ePermCoef*qiQI[3] + eUindCoef*qiUindI[2];
+    VijR[3]  += dPermCoef*qiQJ[11];
+    VjiR[11]  = dPermCoef*qiQI[3] + dUindCoef*qiUindI[2];
+    Vijd[1] += eUindCoef*qiQJ[10];
+    Vijd[2] += eUindCoef*qiQJ[11];
+    // O-D and O-Uind (m=1)
+    Vij[10]   = ePermCoef*qiQJ[2] + eUindCoef*qiUindJ[1];
+    Vji[2]   += ePermCoef*qiQI[10];
+    VijR[10]  = dPermCoef*qiQJ[2] + dUindCoef*qiUindJ[1];
+    VjiR[2]  += dPermCoef*qiQI[10];
+    Vij[11]   = ePermCoef*qiQJ[3] + eUindCoef*qiUindJ[2];
+    Vji[3]   += ePermCoef*qiQI[11];
+    VijR[11]  = dPermCoef*qiQJ[3] + dUindCoef*qiUindJ[2];
+    VjiR[3]  += dPermCoef*qiQI[11];
+    Vjid[1] += eUindCoef*qiQI[10];
+    Vjid[2] += eUindCoef*qiQI[11];
+
+    // Q-O (m=0)
+    ePermCoef = -10.0*rInvVec[6]*mScale;
+    dPermCoef = 30.0*rInvVec[7]*mScale;
+    Vij[4]  += ePermCoef*qiQJ[9];
+    Vji[9]  += ePermCoef*qiQI[4];
+    VijR[4] += dPermCoef*qiQJ[9];
+    VjiR[9] += dPermCoef*qiQI[4];
+    // O-Q (m=0)
+    Vij[9]  -= ePermCoef*qiQJ[4];
+    Vji[4]  -= ePermCoef*qiQI[9];
+    VijR[9] -= dPermCoef*qiQJ[4];
+    VjiR[4] -= dPermCoef*qiQI[9];
+    // Q-O (m=1)
+    ePermCoef = 5.0*sqrtTwo*rInvVec[6]*mScale;
+    dPermCoef = -15.0*sqrtTwo*rInvVec[7]*mScale;
+    Vij[5]   += ePermCoef*qiQJ[10];
+    Vji[10]  += ePermCoef*qiQI[5];
+    VijR[5]  += dPermCoef*qiQJ[10];
+    VjiR[10] += dPermCoef*qiQI[5];
+    Vij[6]   += ePermCoef*qiQJ[11];
+    Vji[11]  += ePermCoef*qiQI[6];
+    VijR[6]  += dPermCoef*qiQJ[11];
+    VjiR[11] += dPermCoef*qiQI[6];
+    // O-Q (m=1)
+    Vij[10]  -= ePermCoef*qiQJ[5];
+    Vji[5]   -= ePermCoef*qiQI[10];
+    VijR[10] -= dPermCoef*qiQJ[5];
+    VjiR[5]  -= dPermCoef*qiQI[10];
+    Vij[11]  -= ePermCoef*qiQJ[6];
+    Vji[6]   -= ePermCoef*qiQI[11];
+    VijR[11] -= dPermCoef*qiQJ[6];
+    VjiR[6]  -= dPermCoef*qiQI[11];
+    // Q-O (m=2)
+    ePermCoef = -sqrtFive*rInvVec[6]*mScale;
+    dPermCoef = 3.0*sqrtFive*rInvVec[7]*mScale;
+    Vij[7]  += ePermCoef*qiQJ[12];
+    Vji[12]  = ePermCoef*qiQI[7];
+    VijR[7] += dPermCoef*qiQJ[12];
+    VjiR[12] = dPermCoef*qiQI[7];
+    Vij[8]  += ePermCoef*qiQJ[13];
+    Vji[13]  = ePermCoef*qiQI[8];
+    VijR[8] += dPermCoef*qiQJ[13];
+    VjiR[13] = dPermCoef*qiQI[8];
+    // O-Q (m=2)
+    Vij[12]  = -ePermCoef*qiQJ[7];
+    Vji[7]  -=  ePermCoef*qiQI[12];
+    VijR[12] = -dPermCoef*qiQJ[7];
+    VjiR[7] -=  dPermCoef*qiQI[12];
+    Vij[13]  = -ePermCoef*qiQJ[8];
+    Vji[8]  -=  ePermCoef*qiQI[13];
+    VijR[13] = -dPermCoef*qiQJ[8];
+    VjiR[8] -=  dPermCoef*qiQI[13];
+
+    // O-O (m=0)
+    ePermCoef = -20.*rInvVec[7]*mScale;
+    dPermCoef = 70.0*rInvVec[8]*mScale;
+    Vij[9]  += ePermCoef*qiQJ[9];
+    Vji[9]  += ePermCoef*qiQI[9];
+    VijR[9] += dPermCoef*qiQJ[9];
+    VjiR[9] += dPermCoef*qiQI[9];
+    // O-O (m=1)
+    ePermCoef = 15.0*rInvVec[7]*mScale;
+    dPermCoef = -52.5*rInvVec[8]*mScale;
+    Vij[10]  += ePermCoef*qiQJ[10];
+    Vji[10]  += ePermCoef*qiQI[10];
+    VijR[10] += dPermCoef*qiQJ[10];
+    VjiR[10] += dPermCoef*qiQI[10];
+    Vij[11]  += ePermCoef*qiQJ[11];
+    Vji[11]  += ePermCoef*qiQI[11];
+    VijR[11] += dPermCoef*qiQJ[11];
+    VjiR[11] += dPermCoef*qiQI[11];
+    // O-O (m=2)
+    ePermCoef = -6.0*rInvVec[7]*mScale;
+    dPermCoef = 21.0*rInvVec[8]*mScale;
+    Vij[12]  += ePermCoef*qiQJ[12];
+    Vji[12]  += ePermCoef*qiQI[12];
+    VijR[12] += dPermCoef*qiQJ[12];
+    VjiR[12] += dPermCoef*qiQI[12];
+    Vij[13]  += ePermCoef*qiQJ[13];
+    Vji[13]  += ePermCoef*qiQI[13];
+    VijR[13] += dPermCoef*qiQJ[13];
+    VjiR[13] += dPermCoef*qiQI[13];
+    // O-O (m=3)
+    ePermCoef = rInvVec[7]*mScale;
+    dPermCoef = -3.5*rInvVec[8]*mScale;
+    Vij[14]  = ePermCoef*qiQJ[14];
+    Vji[14]  = ePermCoef*qiQI[14];
+    VijR[14] = dPermCoef*qiQJ[14];
+    VjiR[14] = dPermCoef*qiQI[14];
+    Vij[15]  = ePermCoef*qiQJ[15];
+    Vji[15]  = ePermCoef*qiQI[15];
+    VijR[15] = dPermCoef*qiQJ[15];
+    VjiR[15] = dPermCoef*qiQI[15];
+
     // Evaluate the energies, forces and torques due to permanent+induced moments
     // interacting with just the permanent moments.
     double energy = 0.5*(qiQI[0]*Vij[0] + qiQJ[0]*Vji[0]);
     double fIZ = qiQI[0]*VijR[0];
     double fJZ = qiQJ[0]*VjiR[0];
     double EIX = 0.0, EIY = 0.0, EIZ = 0.0, EJX = 0.0, EJY = 0.0, EJZ = 0.0;
-    for (int i = 1; i < 9; ++i) {
+    for (int i = 1; i < 16; ++i) {
         energy += 0.5*(qiQI[i]*Vij[i] + qiQJ[i]*Vji[i]);
         fIZ += qiQI[i]*VijR[i];
         fJZ += qiQJ[i]*VjiR[i];
@@ -1635,7 +1812,6 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
         EJY += qiQJY[i]*Vji[i];
         EJZ += qiQJZ[i]*Vji[i];
     }
-
     // Define the torque intermediates for the induced dipoles. These are simply the induced dipole torque
     // intermediates dotted with the field due to permanent moments only, at each center. We inline the
     // induced dipole torque intermediates here, for simplicity. N.B. There are no torques on the dipoles
@@ -1644,33 +1820,39 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     //
     // The torque about the x axis (needed to obtain the y force on the induced dipoles, below)
     //    qiUindIx[0] = qiQUindI[2];    qiUindIx[1] = 0;    qiUindIx[2] = -qiQUindI[0]
-    double iEIX = qiUinpI[2]*Vijp[0] + qiUindI[2]*Vijd[0] - qiUinpI[0]*Vijp[2] - qiUindI[0]*Vijd[2];
-    double iEJX = qiUinpJ[2]*Vjip[0] + qiUindJ[2]*Vjid[0] - qiUinpJ[0]*Vjip[2] - qiUindJ[0]*Vjid[2];
+    double iEIX = qiUindI[2]*Vijd[0] - qiUindI[0]*Vijd[2];
+    double iEJX = qiUindJ[2]*Vjid[0] - qiUindJ[0]*Vjid[2];
     // The torque about the y axis (needed to obtain the x force on the induced dipoles, below)
     //    qiUindIy[0] = -qiQUindI[1];   qiUindIy[1] = qiQUindI[0];    qiUindIy[2] = 0
-    double iEIY = qiUinpI[0]*Vijp[1] + qiUindI[0]*Vijd[1] - qiUinpI[1]*Vijp[0] - qiUindI[1]*Vijd[0];
-    double iEJY = qiUinpJ[0]*Vjip[1] + qiUindJ[0]*Vjid[1] - qiUinpJ[1]*Vjip[0] - qiUindJ[1]*Vjid[0];
+    double iEIY = qiUindI[0]*Vijd[1] - qiUindI[1]*Vijd[0];
+    double iEJY = qiUindJ[0]*Vjid[1] - qiUindJ[1]*Vjid[0];
+    // The torque about the z axis (needed to obtain the x force on the induced dipoles, below)
+    //    qiUindIz[0] = 0;  qiUindIz[1] = -qiQUindI[2];    qiUindIz[2] = qiQUindI[1]
+    double iEIZ = qiUindI[1]*Vijd[2] - qiUindI[2]*Vijd[1];
+    double iEJZ = qiUindJ[1]*Vjid[2] - qiUindJ[2]*Vjid[1];
 
     // Add in the induced-induced terms, if needed.
     if(getPolarizationType() == MPIDReferenceForce::Mutual) {
         // Uind-Uind terms (m=0)
-        double eCoef = -4.0*rInvVec[3]*uScale*thole_d0;
-        double dCoef = 6.0*rInvVec[4]*uScale*dthole_d0;
-        iEIX += eCoef*(qiUinpI[2]*qiUindJ[0] + qiUindI[2]*qiUinpJ[0]);
-        iEJX += eCoef*(qiUinpJ[2]*qiUindI[0] + qiUindJ[2]*qiUinpI[0]);
-        iEIY -= eCoef*(qiUinpI[1]*qiUindJ[0] + qiUindI[1]*qiUinpJ[0]);
-        iEJY -= eCoef*(qiUinpJ[1]*qiUindI[0] + qiUindJ[1]*qiUinpI[0]);
-        fIZ += dCoef*(qiUinpI[0]*qiUindJ[0] + qiUindI[0]*qiUinpJ[0]);
-        fJZ += dCoef*(qiUinpJ[0]*qiUindI[0] + qiUindJ[0]*qiUinpI[0]);
+        double eCoef = -8.0*rInvVec[3]*uScale*thole_d0;
+        double dCoef = 12.0*rInvVec[4]*uScale*dthole_d0;
+        iEIX += eCoef*qiUindI[2]*qiUindJ[0];
+        iEJX += eCoef*qiUindJ[2]*qiUindI[0];
+        iEIY -= eCoef*qiUindI[1]*qiUindJ[0];
+        iEJY -= eCoef*qiUindJ[1]*qiUindI[0];
+        fIZ  += dCoef*qiUindI[0]*qiUindJ[0];
+        fJZ  += dCoef*qiUindJ[0]*qiUindI[0];
         // Uind-Uind terms (m=1)
-        eCoef = 2.0*rInvVec[3]*uScale*thole_d1;
-        dCoef = -3.0*rInvVec[4]*uScale*dthole_d1;
-        iEIX -= eCoef*(qiUinpI[0]*qiUindJ[2] + qiUindI[0]*qiUinpJ[2]);
-        iEJX -= eCoef*(qiUinpJ[0]*qiUindI[2] + qiUindJ[0]*qiUinpI[2]);
-        iEIY += eCoef*(qiUinpI[0]*qiUindJ[1] + qiUindI[0]*qiUinpJ[1]);
-        iEJY += eCoef*(qiUinpJ[0]*qiUindI[1] + qiUindJ[0]*qiUinpI[1]);
-        fIZ += dCoef*(qiUinpI[1]*qiUindJ[1] + qiUindI[1]*qiUinpJ[1] + qiUinpI[2]*qiUindJ[2] + qiUindI[2]*qiUinpJ[2]);
-        fJZ += dCoef*(qiUinpJ[1]*qiUindI[1] + qiUindJ[1]*qiUinpI[1] + qiUinpJ[2]*qiUindI[2] + qiUindJ[2]*qiUinpI[2]);
+        eCoef = 4.0*rInvVec[3]*uScale*thole_d1;
+        dCoef = -6.0*rInvVec[4]*uScale*dthole_d1;
+        iEIX -= eCoef*qiUindI[0]*qiUindJ[2];
+        iEJX -= eCoef*qiUindJ[0]*qiUindI[2];
+        iEIY += eCoef*qiUindI[0]*qiUindJ[1];
+        iEJY += eCoef*qiUindJ[0]*qiUindI[1];
+        iEIZ += eCoef*qiUindI[1]*qiUindJ[2];
+        iEJZ += eCoef*qiUindJ[1]*qiUindI[2];
+        fIZ  += dCoef*(qiUindI[1]*qiUindJ[1] + qiUindI[2]*qiUindJ[2]);
+        fJZ  += dCoef*(qiUindJ[1]*qiUindI[1] + qiUindJ[2]*qiUindI[2]);
     }
 
     // The quasi-internal frame forces and torques.  Note that the induced torque intermediates are
@@ -1678,8 +1860,19 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
     double qiForce[3] = {rInv*(EIY+EJY+iEIY+iEJY), -rInv*(EIX+EJX+iEIX+iEJX), -(fJZ+fIZ)};
     double qiTorqueI[3] = {-EIX, -EIY, -EIZ};
     double qiTorqueJ[3] = {-EJX, -EJY, -EJZ};
+    if(particleI.isAnisotropic){
+        qiTorqueI[0] += -iEIX;
+        qiTorqueI[1] += -iEIY;
+        qiTorqueI[2] += -iEIZ;
+    }
+    if(particleJ.isAnisotropic){
+        qiTorqueJ[0] += -iEJX;
+        qiTorqueJ[1] += -iEJY;
+        qiTorqueJ[2] += -iEJZ;
+    }
 
     // Rotate the forces and torques back to the lab frame
+    Vec3 tmpf, tmpi, tmpj;
     for (int ii = 0; ii < 3; ii++) {
         double forceVal = 0.0;
         double torqueIVal = 0.0;
@@ -1689,10 +1882,13 @@ double MPIDReferenceForce::calculateElectrostaticPairIxn(const MultipoleParticle
             torqueIVal += forceRotationMatrix[ii][jj] * qiTorqueI[jj];
             torqueJVal += forceRotationMatrix[ii][jj] * qiTorqueJ[jj];
         }
+        tmpi[ii] = torqueIVal;
+        tmpj[ii] = torqueJVal;
+        tmpf[ii] = forceVal;
         torque[iIndex][ii] += torqueIVal;
-        torque[kIndex][ii] += torqueJVal;
-        forces[iIndex][ii] -= forceVal;
-        forces[kIndex][ii] += forceVal;
+        torque[jIndex][ii] += torqueJVal;
+        forces[iIndex][ii]  -= forceVal;
+        forces[jIndex][ii]  += forceVal;
     }
     return energy;
 }
@@ -1979,6 +2175,14 @@ double MPIDReferenceForce::calculateElectrostatic(const vector<MultipoleParticle
                     forces[i][2] += p*prefac*(_ptDipoleD[l][i][0]*_ptDipoleFieldGradientD[m][6*i+4]
                                             + _ptDipoleD[l][i][1]*_ptDipoleFieldGradientD[m][6*i+5]
                                             + _ptDipoleD[l][i][2]*_ptDipoleFieldGradientD[m][6*i+2]);
+                    if(particleData[i].isAnisotropic){
+                        torques[i][0] += p*prefac*(_ptDipoleD[l][i][1]*_ptDipoleFieldD[m][3*i+2]
+                                                 - _ptDipoleD[l][i][2]*_ptDipoleFieldD[m][3*i+1]);
+                        torques[i][1] += p*prefac*(_ptDipoleD[l][i][2]*_ptDipoleFieldD[m][3*i+0]
+                                                 - _ptDipoleD[l][i][0]*_ptDipoleFieldD[m][3*i+2]);
+                        torques[i][2] += p*prefac*(_ptDipoleD[l][i][0]*_ptDipoleFieldD[m][3*i+1]
+                                                 - _ptDipoleD[l][i][1]*_ptDipoleFieldD[m][3*i+0]);
+                    }
                 }
             }
         }
@@ -2710,7 +2914,6 @@ void MPIDReferencePmeForce::calculateFixedMultipoleFieldPairIxn(const MultipoleP
     fjm += -oI*(3.0*bn3) + deltaR*bn4*oI.dot(deltaR);
     fid += -oJ*(3.0*drr7) + deltaR*drr9*oJ.dot(deltaR);
     fjd += -oI*(3.0*drr7) + deltaR*drr9*oI.dot(deltaR);
-
     // increment the field at each site due to this interaction
     _fixedMultipoleField[iIndex] += fim - fid;
     _fixedMultipoleField[jIndex] += fjm - fjd;
@@ -4469,8 +4672,8 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VjiR[8] = dPermCoef*qiQI[8];
 
     // C-O (m=0)
-    ePermCoef = rInvVec[4]*(-mScale - bVec[3] - 0.2666666666666667*alphaRVec[5]*X);
-    dPermCoef = 0.5*0.2666666666666667*rInvVec[5]*(15.*(mScale+bVec[3])+2.*(2.*alphaRVec[5]+alphaRVec[7])*X);
+    ePermCoef = rInvVec[4]*(-mScale - bVec[3] - fourOverFifteen*alphaRVec[5]*X);
+    dPermCoef = 0.5*fourOverFifteen*rInvVec[5]*(15.*(mScale+bVec[3])+2.*(2.*alphaRVec[5]+alphaRVec[7])*X);
     Vij[0]  += ePermCoef*qiQJ[9];
     Vji[9]   = ePermCoef*qiQI[0];
     VijR[0] += dPermCoef*qiQJ[9];
@@ -4482,10 +4685,10 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VjiR[0] -=  dPermCoef*qiQI[9];
 
     // D-O and Uind-O (m=0)
-    ePermCoef = -4.*rInvVec[5]*(mScale+bVec[4]+0.1333333333333333*alphaRVec[7]*X);
-    eUindCoef = -8.*rInvVec[5]*(dScale*thole_o0+bVec[4]+0.1333333333333333*alphaRVec[7]*X);
-    dPermCoef = 0.5*0.2666666666666667*rInvVec[6]*(75.*(mScale+bVec[4])+4.*(1.+alphaRVec[2])*alphaRVec[7]*X);
-    dUindCoef = 2.0*0.2666666666666667*rInvVec[6]*(75.*(dScale*dthole_o0+bVec[4])+4.*(1.+alphaRVec[2])*alphaRVec[7]*X);
+    ePermCoef = -4.*rInvVec[5]*(mScale+bVec[4]+twoOverFifteen*alphaRVec[7]*X);
+    eUindCoef = -8.*rInvVec[5]*(dScale*thole_o0+bVec[4]+twoOverFifteen*alphaRVec[7]*X);
+    dPermCoef = 0.5*fourOverFifteen*rInvVec[6]*(75.*(mScale+bVec[4])+4.*(1.+alphaRVec[2])*alphaRVec[7]*X);
+    dUindCoef = 2.0*fourOverFifteen*rInvVec[6]*(75.*(dScale*dthole_o0+bVec[4])+4.*(1.+alphaRVec[2])*alphaRVec[7]*X);
     Vij[1]  += ePermCoef*qiQJ[9];
     Vji[9]  += ePermCoef*qiQI[1] + eUindCoef*qiUindI[0];
     VijR[1] += dPermCoef*qiQJ[9];
@@ -4498,10 +4701,10 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     Vijd[0] += eUindCoef*qiQJ[9];
     Vjid[0] += eUindCoef*qiQI[9];
     // D-O and O-Uind (m=1)
-    ePermCoef = 2.449489742783178*(mScale+bVec[4])*rInvVec[5];
-    eUindCoef = 2.0*2.449489742783178*(dScale*thole_o1+bVec[4])*rInvVec[5];
-    dPermCoef = -0.5*0.1632993161855452*rInvVec[6]*(75.*(mScale+bVec[4])+8.*alphaRVec[7]*X);
-    dUindCoef = -2.0*0.1632993161855452*rInvVec[6]*(75.*(dScale*dthole_o1+bVec[4])+8.*alphaRVec[7]*X);
+    ePermCoef = sqrtSix*(mScale+bVec[4])*rInvVec[5];
+    eUindCoef = 2.0*sqrtSix*(dScale*thole_o1+bVec[4])*rInvVec[5];
+    dPermCoef = -0.5*0.2*sqrtTwoThirds*rInvVec[6]*(75.*(mScale+bVec[4])+8.*alphaRVec[7]*X);
+    dUindCoef = -2.0*0.2*sqrtTwoThirds*rInvVec[6]*(75.*(dScale*dthole_o1+bVec[4])+8.*alphaRVec[7]*X);
     Vij[2]   += ePermCoef*qiQJ[10];
     Vji[10]   = ePermCoef*qiQI[2] + eUindCoef*qiUindI[1];
     VijR[2]  += dPermCoef*qiQJ[10];
@@ -4525,8 +4728,8 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     Vjid[2] += eUindCoef*qiQI[11];
 
     // Q-O (m=0)
-    ePermCoef = rInvVec[6]*(-10.*(mScale+bVec[4]) - 0.1777777777777778*(3.+2.*alphaRVec[2])*alphaRVec[7]*X);
-    dPermCoef = 0.5*0.08888888888888889*rInvVec[7]*(675.*(mScale+bVec[4])+2.*(27.+4.*alphaRVec[4])*alphaRVec[7]*X);
+    ePermCoef = rInvVec[6]*(-10.*(mScale+bVec[4]) - eightOverFortyFive*(3.+2.*alphaRVec[2])*alphaRVec[7]*X);
+    dPermCoef = 0.5*fourOverFortyFive*rInvVec[7]*(675.*(mScale+bVec[4])+2.*(27.+4.*alphaRVec[4])*alphaRVec[7]*X);
     Vij[4]  += ePermCoef*qiQJ[9];
     Vji[9]  += ePermCoef*qiQI[4];
     VijR[4] += dPermCoef*qiQJ[9];
@@ -4537,8 +4740,8 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VijR[9] -= dPermCoef*qiQJ[4];
     VjiR[4] -= dPermCoef*qiQI[9];
     // Q-O (m=1)
-    ePermCoef = 7.071067811865475*rInvVec[6]*(mScale+bVec[4] + 0.1066666666666667*alphaRVec[7]*X);
-    dPermCoef = -0.5*0.1885618083164127*rInvVec[7]*(225.*(mScale+bVec[4])+8.*(2.+alphaRVec[2])*alphaRVec[7]*X);
+    ePermCoef = 5.0*sqrtTwo*rInvVec[6]*(mScale+bVec[4] + eightOverSeventyFive*alphaRVec[7]*X);
+    dPermCoef = -0.5*sqrtEightOverFifteen*rInvVec[7]*(225.*(mScale+bVec[4])+8.*(2.+alphaRVec[2])*alphaRVec[7]*X);
     Vij[5]   += ePermCoef*qiQJ[10];
     Vji[10]  += ePermCoef*qiQI[5];
     VijR[5]  += dPermCoef*qiQJ[10];
@@ -4557,8 +4760,8 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VijR[11] -= dPermCoef*qiQJ[6];
     VjiR[6]  -= dPermCoef*qiQI[11];
     // Q-O (m=2)
-    ePermCoef = -2.23606797749979*(mScale+bVec[4])*rInvVec[6];
-    dPermCoef = 0.5*0.298142396999972*rInvVec[7]*(45.*(mScale+bVec[4])+4.*alphaRVec[7]*X);
+    ePermCoef = -sqrtFive*(mScale+bVec[4])*rInvVec[6];
+    dPermCoef = 0.5*twoSqrtFiveOverFifteen*rInvVec[7]*(45.*(mScale+bVec[4])+4.*alphaRVec[7]*X);
     Vij[7]  += ePermCoef*qiQJ[12];
     Vji[12]  = ePermCoef*qiQI[7];
     VijR[7] += dPermCoef*qiQJ[12];
@@ -4578,15 +4781,15 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VjiR[8] -=  dPermCoef*qiQI[13];
 
     // O-O (m=0)
-    ePermCoef = rInvVec[7]*(-20.*(mScale+bVec[5]) - 0.005079365079365079*(15.+28.*alphaRVec[2]+28.*alphaRVec[4])*alphaRVec[7]*X);
-    dPermCoef = 0.5*0.01777777777777778*rInvVec[8]*(7875.*(mScale+bVec[5])+4.*(41. - 4.*alphaRVec[2]+4.*alphaRVec[4])*alphaRVec[9]*X);
+    ePermCoef = rInvVec[7]*(-20.*(mScale+bVec[5]) - eightOverOneFiveSevenFive*(15.+28.*alphaRVec[2]+28.*alphaRVec[4])*alphaRVec[7]*X);
+    dPermCoef = 0.5*fourOverTwoTwoFive*rInvVec[8]*(7875.*(mScale+bVec[5])+4.*(41. - 4.*alphaRVec[2]+4.*alphaRVec[4])*alphaRVec[9]*X);
     Vij[9]  += ePermCoef*qiQJ[9];
     Vji[9]  += ePermCoef*qiQI[9];
     VijR[9] += dPermCoef*qiQJ[9];
     VjiR[9] += dPermCoef*qiQI[9];
     // O-O (m=1)
-    ePermCoef = rInvVec[7]*(15.*(mScale+bVec[5]) + 0.01523809523809524*(-5. + 28.*alphaRVec[2])* alphaRVec[7]*X);
-    dPermCoef = -0.5*0.01333333333333333*rInvVec[8]*(7875.*(mScale+bVec[5]) + 32.*(3. + 2.* alphaRVec[2])*alphaRVec[9]*X);
+    ePermCoef = rInvVec[7]*(15.*(mScale+bVec[5]) + eightOverFiveTwoFive*(-5. + 28.*alphaRVec[2])* alphaRVec[7]*X);
+    dPermCoef = -0.5*twoOverOneFiveZero*rInvVec[8]*(7875.*(mScale+bVec[5]) + 32.*(3. + 2.* alphaRVec[2])*alphaRVec[9]*X);
     Vij[10]  += ePermCoef*qiQJ[10];
     Vji[10]  += ePermCoef*qiQI[10];
     VijR[10] += dPermCoef*qiQJ[10];
@@ -4596,8 +4799,8 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VijR[11] += dPermCoef*qiQJ[11];
     VjiR[11] += dPermCoef*qiQI[11];
     // O-O (m=2)
-    ePermCoef = rInvVec[7]*(-6.*(mScale+bVec[5]) - 0.07619047619047619*alphaRVec[7]*X);
-    dPermCoef = 0.5*rInvVec[8]*(42.*(mScale+bVec[5]) + 1.066666666666667*alphaRVec[9]*X);
+    ePermCoef = rInvVec[7]*(-6.*(mScale+bVec[5]) - eightOverOneHundredFive*alphaRVec[7]*X);
+    dPermCoef = 0.5*rInvVec[8]*(42.*(mScale+bVec[5]) + sixteenOverFifteen*alphaRVec[9]*X);
     Vij[12]  += ePermCoef*qiQJ[12];
     Vji[12]  += ePermCoef*qiQI[12];
     VijR[12] += dPermCoef*qiQJ[12];
@@ -4607,7 +4810,7 @@ double MPIDReferencePmeForce::calculatePmeDirectElectrostaticPairIxn(const Multi
     VijR[13] += dPermCoef*qiQJ[13];
     VjiR[13] += dPermCoef*qiQI[13];
     // O-O (m=3)
-    ePermCoef = rInvVec[7]*((mScale+bVec[5])- 0.07619047619047619*alphaRVec[7]*X);
+    ePermCoef = rInvVec[7]*((mScale+bVec[5]) - eightOverOneHundredFive*alphaRVec[7]*X);
     dPermCoef = -0.5*7.*(mScale+bVec[5])*rInvVec[8];
     Vij[14]  = ePermCoef*qiQJ[14];
     Vji[14]  = ePermCoef*qiQI[14];
