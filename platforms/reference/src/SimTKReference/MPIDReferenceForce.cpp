@@ -36,7 +36,7 @@ using namespace OpenMM;
 MPIDReferenceForce::MPIDReferenceForce() :
                                                    _nonbondedMethod(NoCutoff),
                                                    _numParticles(0),
-                                                   _electric(138.93875744/*138.935455846*/),
+                                                   _electric(138.935455846),
                                                    _dielectric(1.0),
                                                    _mutualInducedDipoleConverged(0),
                                                    _defaultTholeWidth(0.3),
@@ -53,7 +53,7 @@ MPIDReferenceForce::MPIDReferenceForce() :
 MPIDReferenceForce::MPIDReferenceForce(NonbondedMethod nonbondedMethod) :
                                                    _nonbondedMethod(nonbondedMethod),
                                                    _numParticles(0),
-                                                   _electric(138.93875744/*138.935455846*/),
+                                                   _electric(138.935455846),
                                                    _dielectric(1.0),
                                                    _mutualInducedDipoleConverged(0),
                                                    _defaultTholeWidth(0.3),
