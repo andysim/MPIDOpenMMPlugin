@@ -1,6 +1,6 @@
 extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4* __restrict__ multipoleParticles, float* __restrict__ molecularDipoles,
-        float* __restrict__ molecularQuadrupoles, real* __restrict__ labFrameDipoles, real* __restrict__ labFrameQuadrupoles,
-        real* __restrict__ sphericalDipoles, real* __restrict__ sphericalQuadrupoles) {
+        float* __restrict__ molecularQuadrupoles, float* __restrict__ molecularOctopoles, real* __restrict__ labFrameDipoles, real* __restrict__ labFrameQuadrupoles,
+        real* __restrict__ labFrameOctopoles, real* __restrict__ sphericalDipoles, real* __restrict__ sphericalQuadrupoles, real* __restrict__ sphericalOctopoles) {
     for (int atom = blockIdx.x*blockDim.x+threadIdx.x; atom < NUM_ATOMS; atom += gridDim.x*blockDim.x) {
         // Load the spherical multipoles.
         
@@ -14,7 +14,15 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
         sphericalQuadrupoles[offset+2] = (2*SQRT((real) 3))*molecularQuadrupoles[offset+4]; // yz -> Q_21s
         sphericalQuadrupoles[offset+3] = SQRT((real) 3)*(molecularQuadrupoles[offset+0]-molecularQuadrupoles[offset+3]); // xx-yy -> Q_22c
         sphericalQuadrupoles[offset+4] = (2*SQRT((real) 3))*molecularQuadrupoles[offset+1]; // xy -> Q_22s
-        
+        offset = 7*atom;
+        sphericalOctopoles[offset+0] = -15.0f*(molecularOctopoles[offset+2]+molecularOctopoles[offset+6]); // zzz -> Q_30
+        sphericalOctopoles[offset+1] = -15.0f*SQRT((real) 1.5f)*(molecularOctopoles[offset+0]+molecularOctopoles[offset+3]); // xzz -> Q_31c
+        sphericalOctopoles[offset+2] = -15.0f*SQRT((real) 1.5f)*(molecularOctopoles[offset+1]+molecularOctopoles[offset+5]); // yzz -> Q_31s
+        sphericalOctopoles[offset+3] =  15.0f*SQRT((real) 0.6f)*(molecularOctopoles[offset+2]-molecularOctopoles[offset+6]); // xxz-yyz -> Q_32c
+        sphericalOctopoles[offset+4] =  30.0f*SQRT((real) 0.6f)*molecularOctopoles[offset+4]; // xyz -> Q_32s
+        sphericalOctopoles[offset+5] =  15.0f*SQRT((real) 0.1f)*(molecularOctopoles[offset+0]-3.0f*molecularOctopoles[offset+3]); // xxx-xyy -> Q_33c
+        sphericalOctopoles[offset+6] =  15.0f*SQRT((real) 0.1f)*(3.0f*molecularOctopoles[offset+1]-molecularOctopoles[offset+5]); // xxy-yyy -> Q_33s
+
         // get coordinates of this atom and the z & x axis atoms
         // compute the vector between the atoms and 1/sqrt(d2), d2 is distance between
         // this atom and the axis atom
@@ -212,6 +220,75 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             labFrameQuadrupoles[offset+4] = vectorX.y*(vectorX.z*mPoleXX + vectorY.z*mPoleXY + vectorZ.z*mPoleXZ)
                                         + vectorY.y*(vectorX.z*mPoleXY + vectorY.z*mPoleYY + vectorZ.z*mPoleYZ)
                                         + vectorZ.y*(vectorX.z*mPoleXZ + vectorY.z*mPoleYZ + vectorZ.z*mPoleZZ);
+
+
+            // Transform the octopole
+
+            offset = 7*atom;
+            real mPoleXXX = molecularOctopoles[offset+0];
+            real mPoleXXY = molecularOctopoles[offset+1];
+            real mPoleXXZ = molecularOctopoles[offset+2];
+            real mPoleXYY = molecularOctopoles[offset+3];
+            real mPoleXYZ = molecularOctopoles[offset+4];
+            real mPoleXZZ = -molecularOctopoles[offset+0]-molecularOctopoles[offset+3];
+            real mPoleYYY = molecularOctopoles[offset+5];
+            real mPoleYYZ = molecularOctopoles[offset+6];
+            real mPoleYZZ = -molecularOctopoles[offset+1]-molecularOctopoles[offset+5];
+            real mPoleZZZ = -molecularOctopoles[offset+2]-molecularOctopoles[offset+6];
+
+            real T2XXX = vectorX.x*(vectorX.x*mPoleXXX + vectorY.x*mPoleXXY + vectorZ.x*mPoleXXZ) 
+                       + vectorY.x*(vectorX.x*mPoleXXY + vectorY.x*mPoleXYY + vectorZ.x*mPoleXYZ)
+                       + vectorZ.x*(vectorX.x*mPoleXXZ + vectorY.x*mPoleXYZ + vectorZ.x*mPoleXZZ);
+            real T2XXY = vectorX.x*(vectorX.y*mPoleXXX + vectorY.y*mPoleXXY + vectorZ.y*mPoleXXZ)
+                       + vectorY.x*(vectorX.y*mPoleXXY + vectorY.y*mPoleXYY + vectorZ.y*mPoleXYZ)
+                       + vectorZ.x*(vectorX.y*mPoleXXZ + vectorY.y*mPoleXYZ + vectorZ.y*mPoleXZZ);
+            real T2XXZ = vectorX.x*(vectorX.z*mPoleXXX + vectorY.z*mPoleXXY + vectorZ.z*mPoleXXZ)
+                       + vectorY.x*(vectorX.z*mPoleXXY + vectorY.z*mPoleXYY + vectorZ.z*mPoleXYZ)
+                       + vectorZ.x*(vectorX.z*mPoleXXZ + vectorY.z*mPoleXYZ + vectorZ.z*mPoleXZZ);
+            real T2XYY = vectorX.y*(vectorX.y*mPoleXXX + vectorY.y*mPoleXXY + vectorZ.y*mPoleXXZ)
+                       + vectorY.y*(vectorX.y*mPoleXXY + vectorY.y*mPoleXYY + vectorZ.y*mPoleXYZ)
+                       + vectorZ.y*(vectorX.y*mPoleXXZ + vectorY.y*mPoleXYZ + vectorZ.y*mPoleXZZ);
+            real T2XYZ = vectorX.y*(vectorX.z*mPoleXXX + vectorY.z*mPoleXXY + vectorZ.z*mPoleXXZ)
+                       + vectorY.y*(vectorX.z*mPoleXXY + vectorY.z*mPoleXYY + vectorZ.z*mPoleXYZ)
+                       + vectorZ.y*(vectorX.z*mPoleXXZ + vectorY.z*mPoleXYZ + vectorZ.z*mPoleXZZ);
+            real T2YXX = vectorX.x*(vectorX.x*mPoleXXY + vectorY.x*mPoleXYY + vectorZ.x*mPoleXYZ)
+                       + vectorY.x*(vectorX.x*mPoleXYY + vectorY.x*mPoleYYY + vectorZ.x*mPoleYYZ)
+                       + vectorZ.x*(vectorX.x*mPoleXYZ + vectorY.x*mPoleYYZ + vectorZ.x*mPoleYZZ);
+            real T2YXY = vectorX.x*(vectorX.y*mPoleXXY + vectorY.y*mPoleXYY + vectorZ.y*mPoleXYZ)
+                       + vectorY.x*(vectorX.y*mPoleXYY + vectorY.y*mPoleYYY + vectorZ.y*mPoleYYZ)
+                       + vectorZ.x*(vectorX.y*mPoleXYZ + vectorY.y*mPoleYYZ + vectorZ.y*mPoleYZZ);
+            real T2YXZ = vectorX.x*(vectorX.z*mPoleXXY + vectorY.z*mPoleXYY + vectorZ.z*mPoleXYZ)
+                       + vectorY.x*(vectorX.z*mPoleXYY + vectorY.z*mPoleYYY + vectorZ.z*mPoleYYZ)
+                       + vectorZ.x*(vectorX.z*mPoleXYZ + vectorY.z*mPoleYYZ + vectorZ.z*mPoleYZZ);
+            real T2YYY = vectorX.y*(vectorX.y*mPoleXXY + vectorY.y*mPoleXYY + vectorZ.y*mPoleXYZ)
+                       + vectorY.y*(vectorX.y*mPoleXYY + vectorY.y*mPoleYYY + vectorZ.y*mPoleYYZ)
+                       + vectorZ.y*(vectorX.y*mPoleXYZ + vectorY.y*mPoleYYZ + vectorZ.y*mPoleYZZ);
+            real T2YYZ = vectorX.y*(vectorX.z*mPoleXXY + vectorY.z*mPoleXYY + vectorZ.z*mPoleXYZ)
+                       + vectorY.y*(vectorX.z*mPoleXYY + vectorY.z*mPoleYYY + vectorZ.z*mPoleYYZ)
+                       + vectorZ.y*(vectorX.z*mPoleXYZ + vectorY.z*mPoleYYZ + vectorZ.z*mPoleYZZ);
+            real T2ZXX = vectorX.x*(vectorX.x*mPoleXXZ + vectorY.x*mPoleXYZ + vectorZ.x*mPoleXZZ)
+                       + vectorY.x*(vectorX.x*mPoleXYZ + vectorY.x*mPoleYYZ + vectorZ.x*mPoleYZZ)
+                       + vectorZ.x*(vectorX.x*mPoleXZZ + vectorY.x*mPoleYZZ + vectorZ.x*mPoleZZZ);
+            real T2ZXY = vectorX.x*(vectorX.y*mPoleXXZ + vectorY.y*mPoleXYZ + vectorZ.y*mPoleXZZ)
+                       + vectorY.x*(vectorX.y*mPoleXYZ + vectorY.y*mPoleYYZ + vectorZ.y*mPoleYZZ)
+                       + vectorZ.x*(vectorX.y*mPoleXZZ + vectorY.y*mPoleYZZ + vectorZ.y*mPoleZZZ);
+            real T2ZXZ = vectorX.x*(vectorX.z*mPoleXXZ + vectorY.z*mPoleXYZ + vectorZ.z*mPoleXZZ)
+                       + vectorY.x*(vectorX.z*mPoleXYZ + vectorY.z*mPoleYYZ + vectorZ.z*mPoleYZZ)
+                       + vectorZ.x*(vectorX.z*mPoleXZZ + vectorY.z*mPoleYZZ + vectorZ.z*mPoleZZZ);
+            real T2ZYY = vectorX.y*(vectorX.y*mPoleXXZ + vectorY.y*mPoleXYZ + vectorZ.y*mPoleXZZ)
+                       + vectorY.y*(vectorX.y*mPoleXYZ + vectorY.y*mPoleYYZ + vectorZ.y*mPoleYZZ)
+                       + vectorZ.y*(vectorX.y*mPoleXZZ + vectorY.y*mPoleYZZ + vectorZ.y*mPoleZZZ);
+            real T2ZYZ = vectorX.y*(vectorX.z*mPoleXXZ + vectorY.z*mPoleXYZ + vectorZ.z*mPoleXZZ)
+                       + vectorY.y*(vectorX.z*mPoleXYZ + vectorY.z*mPoleYYZ + vectorZ.z*mPoleYZZ)
+                       + vectorZ.y*(vectorX.z*mPoleXZZ + vectorY.z*mPoleYZZ + vectorZ.z*mPoleZZZ);
+
+            labFrameOctopoles[offset+0] = (vectorX.x*T2XXX + vectorY.x*T2YXX + vectorZ.x*T2ZXX);
+            labFrameOctopoles[offset+1] = (vectorX.x*T2XXY + vectorY.x*T2YXY + vectorZ.x*T2ZXY);
+            labFrameOctopoles[offset+2] = (vectorX.x*T2XXZ + vectorY.x*T2YXZ + vectorZ.x*T2ZXZ);
+            labFrameOctopoles[offset+3] = (vectorX.x*T2XYY + vectorY.x*T2YYY + vectorZ.x*T2ZYY);
+            labFrameOctopoles[offset+4] = (vectorX.x*T2XYZ + vectorY.x*T2YYZ + vectorZ.x*T2ZYZ);
+            labFrameOctopoles[offset+5] = (vectorX.y*T2XYY + vectorY.y*T2YYY + vectorZ.y*T2ZYY);
+            labFrameOctopoles[offset+6] = (vectorX.y*T2XYZ + vectorY.y*T2YYZ + vectorZ.y*T2ZYZ);
             
             // ---------------------------------------------------------------------------------------
             
@@ -243,6 +320,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             }
             real rotatedQuadrupole[5] = {0, 0, 0, 0, 0};
             real sqrtThree = SQRT((real) 3);
+
             rotatedQuadrupole[0] += sphericalQuadrupole[0]*0.5f*(3.0f*vectorZ.z*vectorZ.z - 1.0f) +
                                     sphericalQuadrupole[1]*sqrtThree*vectorZ.z*vectorX.z +
                                     sphericalQuadrupole[2]*sqrtThree*vectorZ.z*vectorY.z +
@@ -273,6 +351,96 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             sphericalQuadrupoles[offset+2] = rotatedQuadrupole[2];
             sphericalQuadrupoles[offset+3] = rotatedQuadrupole[3];
             sphericalQuadrupoles[offset+4] = rotatedQuadrupole[4];
+
+            offset = 7*atom;
+            real sphericalOctopole[7];
+            sphericalOctopole[0] = sphericalOctopoles[offset+0];
+            sphericalOctopole[1] = sphericalOctopoles[offset+1];
+            sphericalOctopole[2] = sphericalOctopoles[offset+2];
+            sphericalOctopole[3] = sphericalOctopoles[offset+3];
+            sphericalOctopole[4] = sphericalOctopoles[offset+4];
+            sphericalOctopole[5] = sphericalOctopoles[offset+5];
+            sphericalOctopole[6] = sphericalOctopoles[offset+6];
+            real rotatedOctopole[7] = {0, 0, 0, 0, 0, 0, 0};
+            real sqrtSix = SQRT((real) 6);
+            real sqrtTen = SQRT((real) 10);
+            real sqrtFifteen = SQRT((real) 15);
+            real sqrtThreeHalves = SQRT((real) 1.5f);
+            real sqrtFiveHalves = SQRT((real) 2.5f);
+            real sqrtTenth = SQRT((real) 0.1f);
+            real sqrtFourTenths = SQRT((real) 0.4f);
+            real sqrtSixTenths = SQRT((real) 0.6f);
+
+            rotatedOctopole[0] = 
+                  sphericalOctopole[0]*((-3.0f*vectorX.z*vectorX.z*vectorZ.z)/2. - (3.0f*vectorY.z*vectorY.z*vectorZ.z)/2. + vectorZ.z*vectorZ.z*vectorZ.z) 
+                + sphericalOctopole[1]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorX.z)/2. - (sqrtThreeHalves*vectorX.z*vectorY.z*vectorY.z)/2.  + sqrtSix*vectorX.z*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[2]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorY.z)/2. - (sqrtThreeHalves*vectorY.z*vectorY.z*vectorY.z)/2. + sqrtSix*vectorY.z*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[3]*((sqrtFifteen*vectorX.z*vectorX.z*vectorZ.z)/2. - (sqrtFifteen*vectorY.z*vectorY.z*vectorZ.z)/2.)
+                + sqrtFifteen*sphericalOctopole[4]*vectorX.z*vectorY.z*vectorZ.z
+                + sphericalOctopole[5]*((sqrtFiveHalves*vectorX.z*vectorX.z*vectorX.z)/2. - (3.0f*sqrtFiveHalves*vectorX.z*vectorY.z*vectorY.z)/2.)
+                + sphericalOctopole[6]*((3.0f*sqrtFiveHalves*vectorX.z*vectorX.z*vectorY.z)/2. - (sqrtFiveHalves*vectorY.z*vectorY.z*vectorY.z)/2.);
+
+            rotatedOctopole[1] = 
+                  sphericalOctopole[0]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorZ.x)/2. - (sqrtThreeHalves*vectorY.z*vectorY.z*vectorZ.x)/2. - sqrtThreeHalves*vectorX.x*vectorX.z*vectorZ.z - sqrtThreeHalves*vectorY.x*vectorY.z*vectorZ.z + sqrtThreeHalves*vectorZ.x*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[1]*((-3.0f*vectorX.x*vectorX.z*vectorX.z)/4. - (vectorX.z*vectorY.x*vectorY.z)/2. - (vectorX.x*vectorY.z*vectorY.z)/4. + 2.0f*vectorX.z*vectorZ.x*vectorZ.z + vectorX.x*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[2]*(-(vectorX.z*vectorX.z*vectorY.x)/4. - (vectorX.x*vectorX.z*vectorY.z)/2. - (3.0f*vectorY.x*vectorY.z*vectorY.z)/4. + 2.0f*vectorY.z*vectorZ.x*vectorZ.z + vectorY.x*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[3]*((sqrtFiveHalves*vectorX.z*vectorX.z*vectorZ.x)/2. - (sqrtFiveHalves*vectorY.z*vectorY.z*vectorZ.x)/2. + sqrtFiveHalves*vectorX.x*vectorX.z*vectorZ.z - sqrtFiveHalves*vectorY.x*vectorY.z*vectorZ.z)
+                + sphericalOctopole[4]*(sqrtFiveHalves*vectorX.z*vectorY.z*vectorZ.x + sqrtFiveHalves*vectorX.z*vectorY.x*vectorZ.z + sqrtFiveHalves*vectorX.x*vectorY.z*vectorZ.z)
+                + sphericalOctopole[5]*((sqrtFifteen*vectorX.x*vectorX.z*vectorX.z)/4. - (sqrtFifteen*vectorX.z*vectorY.x*vectorY.z)/2. - (sqrtFifteen*vectorX.x*vectorY.z*vectorY.z)/4.)
+                + sphericalOctopole[6]*((sqrtFifteen*vectorX.z*vectorX.z*vectorY.x)/4. + (sqrtFifteen*vectorX.x*vectorX.z*vectorY.z)/2. - (sqrtFifteen*vectorY.x*vectorY.z*vectorY.z)/4.);
+
+            rotatedOctopole[2] = 
+                  sphericalOctopole[0]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorZ.y)/2. - (sqrtThreeHalves*vectorY.z*vectorY.z*vectorZ.y)/2. - sqrtThreeHalves*vectorX.y*vectorX.z*vectorZ.z - sqrtThreeHalves*vectorY.y*vectorY.z*vectorZ.z + sqrtThreeHalves*vectorZ.y*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[1]*((-3.0f*vectorX.y*vectorX.z*vectorX.z)/4. - (vectorX.z*vectorY.y*vectorY.z)/2. - (vectorX.y*vectorY.z*vectorY.z)/4. + 2.0f*vectorX.z*vectorZ.y*vectorZ.z + vectorX.y*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[2]*(-(vectorX.z*vectorX.z*vectorY.y)/4. - (vectorX.y*vectorX.z*vectorY.z)/2. - (3.0f*vectorY.y*vectorY.z*vectorY.z)/4. + 2.0f*vectorY.z*vectorZ.y*vectorZ.z + vectorY.y*vectorZ.z*vectorZ.z)
+                + sphericalOctopole[3]*((sqrtFiveHalves*vectorX.z*vectorX.z*vectorZ.y)/2. - (sqrtFiveHalves*vectorY.z*vectorY.z*vectorZ.y)/2. + sqrtFiveHalves*vectorX.y*vectorX.z*vectorZ.z - sqrtFiveHalves*vectorY.y*vectorY.z*vectorZ.z)
+                + sphericalOctopole[4]*(sqrtFiveHalves*vectorX.z*vectorY.z*vectorZ.y + sqrtFiveHalves*vectorX.z*vectorY.y*vectorZ.z + sqrtFiveHalves*vectorX.y*vectorY.z*vectorZ.z)
+                + sphericalOctopole[5]*((sqrtFifteen*vectorX.y*vectorX.z*vectorX.z)/4. - (sqrtFifteen*vectorX.z*vectorY.y*vectorY.z)/2. - (sqrtFifteen*vectorX.y*vectorY.z*vectorY.z)/4.)
+                + sphericalOctopole[6]*((sqrtFifteen*vectorX.z*vectorX.z*vectorY.y)/4. + (sqrtFifteen*vectorX.y*vectorX.z*vectorY.z)/2. - (sqrtFifteen*vectorY.y*vectorY.z*vectorY.z)/4.);
+
+            rotatedOctopole[3] = 
+                  sphericalOctopole[0]*(-(sqrtSixTenths*vectorX.x*vectorX.z*vectorZ.x) - sqrtSixTenths*vectorY.x*vectorY.z*vectorZ.x + sqrtSixTenths*vectorX.y*vectorX.z*vectorZ.y + sqrtSixTenths*vectorY.y*vectorY.z*vectorZ.y - (sqrtSixTenths*vectorX.x*vectorX.x*vectorZ.z)/2. + (sqrtSixTenths*vectorX.y*vectorX.y*vectorZ.z)/2. - (sqrtSixTenths*vectorY.x*vectorY.x*vectorZ.z)/2. + (sqrtSixTenths*vectorY.y*vectorY.y*vectorZ.z)/2. + sqrtSixTenths*vectorZ.x*vectorZ.x*vectorZ.z - sqrtSixTenths*vectorZ.y*vectorZ.y*vectorZ.z)
+                + sphericalOctopole[1]*((-3.0f*vectorX.x*vectorX.x*vectorX.z)/(2.*sqrtTen) + (3.0f*vectorX.y*vectorX.y*vectorX.z)/(2.*sqrtTen) - (vectorX.z*vectorY.x*vectorY.x)/(2.*sqrtTen) + (vectorX.z*vectorY.y*vectorY.y)/(2.*sqrtTen) - (vectorX.x*vectorY.x*vectorY.z)/sqrtTen + (vectorX.y*vectorY.y*vectorY.z)/sqrtTen + sqrtFourTenths*vectorX.z*vectorZ.x*vectorZ.x - sqrtFourTenths*vectorX.z*vectorZ.y*vectorZ.y + 2.0f*sqrtFourTenths*vectorX.x*vectorZ.x*vectorZ.z - 2.0f*sqrtFourTenths*vectorX.y*vectorZ.y*vectorZ.z)
+                + sphericalOctopole[2]*(-((vectorX.x*vectorX.z*vectorY.x)/sqrtTen) + (vectorX.y*vectorX.z*vectorY.y)/sqrtTen - (vectorX.x*vectorX.x*vectorY.z)/(2.*sqrtTen) + (vectorX.y*vectorX.y*vectorY.z)/(2.*sqrtTen) - (3.0f*vectorY.x*vectorY.x*vectorY.z)/(2.*sqrtTen) + (3.0f*vectorY.y*vectorY.y*vectorY.z)/(2.*sqrtTen) + sqrtFourTenths*vectorY.z*vectorZ.x*vectorZ.x - sqrtFourTenths*vectorY.z*vectorZ.y*vectorZ.y + 2.0f*sqrtFourTenths*vectorY.x*vectorZ.x*vectorZ.z - 2.0f*sqrtFourTenths*vectorY.y*vectorZ.y*vectorZ.z)
+                + sphericalOctopole[3]* (vectorX.x*vectorX.z*vectorZ.x - vectorY.x*vectorY.z*vectorZ.x - vectorX.y*vectorX.z*vectorZ.y + vectorY.y*vectorY.z*vectorZ.y + (vectorX.x*vectorX.x*vectorZ.z)/2. - (vectorX.y*vectorX.y*vectorZ.z)/2. - (vectorY.x*vectorY.x*vectorZ.z)/2. + (vectorY.y*vectorY.y*vectorZ.z)/2.)
+                + sphericalOctopole[4]*(vectorX.z*vectorY.x*vectorZ.x + vectorX.x*vectorY.z*vectorZ.x - vectorX.z*vectorY.y*vectorZ.y - vectorX.y*vectorY.z*vectorZ.y + vectorX.x*vectorY.x*vectorZ.z - vectorX.y*vectorY.y*vectorZ.z)
+                + sphericalOctopole[5]* ((sqrtThreeHalves*vectorX.x*vectorX.x*vectorX.z)/2. - (sqrtThreeHalves*vectorX.y*vectorX.y*vectorX.z)/2. - (sqrtThreeHalves*vectorX.z*vectorY.x*vectorY.x)/2. + (sqrtThreeHalves*vectorX.z*vectorY.y*vectorY.y)/2. - sqrtThreeHalves*vectorX.x*vectorY.x*vectorY.z + sqrtThreeHalves*vectorX.y*vectorY.y*vectorY.z)
+                + sphericalOctopole[6]*(sqrtThreeHalves*vectorX.x*vectorX.z*vectorY.x - sqrtThreeHalves*vectorX.y*vectorX.z*vectorY.y + (sqrtThreeHalves*vectorX.x*vectorX.x*vectorY.z)/2. - (sqrtThreeHalves*vectorX.y*vectorX.y*vectorY.z)/2. - (sqrtThreeHalves*vectorY.x*vectorY.x*vectorY.z)/2. + (sqrtThreeHalves*vectorY.y*vectorY.y*vectorY.z)/2.);
+
+            rotatedOctopole[4] = 
+                  sphericalOctopole[0]*(-(sqrtSixTenths*vectorX.y*vectorX.z*vectorZ.x) - sqrtSixTenths*vectorY.y*vectorY.z*vectorZ.x - sqrtSixTenths*vectorX.x*vectorX.z*vectorZ.y - sqrtSixTenths*vectorY.x*vectorY.z*vectorZ.y - sqrtSixTenths*vectorX.x*vectorX.y*vectorZ.z - sqrtSixTenths*vectorY.x*vectorY.y*vectorZ.z + 2.0f*sqrtSixTenths*vectorZ.x*vectorZ.y*vectorZ.z) 
+                + sphericalOctopole[1]*((-3.0f*vectorX.x*vectorX.y*vectorX.z)/sqrtTen - (vectorX.z*vectorY.x*vectorY.y)/sqrtTen - (vectorX.y*vectorY.x*vectorY.z)/sqrtTen - (vectorX.x*vectorY.y*vectorY.z)/sqrtTen + 2.0f*sqrtFourTenths*vectorX.z*vectorZ.x*vectorZ.y + 2.0f*sqrtFourTenths*vectorX.y*vectorZ.x*vectorZ.z + 2.0f*sqrtFourTenths*vectorX.x*vectorZ.y*vectorZ.z)
+                + sphericalOctopole[2]*(-((vectorX.y*vectorX.z*vectorY.x)/sqrtTen) - (vectorX.x*vectorX.z*vectorY.y)/sqrtTen - (vectorX.x*vectorX.y*vectorY.z)/sqrtTen - (3.0f*vectorY.x*vectorY.y*vectorY.z)/sqrtTen + 2.0f*sqrtFourTenths*vectorY.z*vectorZ.x*vectorZ.y + 2.0f*sqrtFourTenths*vectorY.y*vectorZ.x*vectorZ.z + 2.0f*sqrtFourTenths*vectorY.x*vectorZ.y*vectorZ.z)
+                + sphericalOctopole[3]*(vectorX.y*vectorX.z*vectorZ.x - vectorY.y*vectorY.z*vectorZ.x + vectorX.x*vectorX.z*vectorZ.y - vectorY.x*vectorY.z*vectorZ.y + vectorX.x*vectorX.y*vectorZ.z - vectorY.x*vectorY.y*vectorZ.z)
+                + sphericalOctopole[4]*(vectorX.z*vectorY.y*vectorZ.x + vectorX.y*vectorY.z*vectorZ.x + vectorX.z*vectorY.x*vectorZ.y + vectorX.x*vectorY.z*vectorZ.y + vectorX.y*vectorY.x*vectorZ.z + vectorX.x*vectorY.y*vectorZ.z)
+                + sphericalOctopole[5]*(sqrtThreeHalves*vectorX.x*vectorX.y*vectorX.z - sqrtThreeHalves*vectorX.z*vectorY.x*vectorY.y - sqrtThreeHalves*vectorX.y*vectorY.x*vectorY.z - sqrtThreeHalves*vectorX.x*vectorY.y*vectorY.z)
+                + sphericalOctopole[6]*(sqrtThreeHalves*vectorX.y*vectorX.z*vectorY.x + sqrtThreeHalves*vectorX.x*vectorX.z*vectorY.y + sqrtThreeHalves*vectorX.x*vectorX.y*vectorY.z - sqrtThreeHalves*vectorY.x*vectorY.y*vectorY.z);
+
+            rotatedOctopole[5] = 
+                  sphericalOctopole[0]*((-3.0f*vectorX.x*vectorX.x*vectorZ.x)/(2.*sqrtTen) + (3.0f*vectorX.y*vectorX.y*vectorZ.x)/(2.*sqrtTen) - (3.0f*vectorY.x*vectorY.x*vectorZ.x)/(2.*sqrtTen) + (3.0f*vectorY.y*vectorY.y*vectorZ.x)/(2.*sqrtTen) + vectorZ.x*vectorZ.x*vectorZ.x/sqrtTen + (3.0f*vectorX.x*vectorX.y*vectorZ.y)/sqrtTen + (3.0f*vectorY.x*vectorY.y*vectorZ.y)/sqrtTen - (3.0f*vectorZ.x*vectorZ.y*vectorZ.y)/sqrtTen)
+                + sphericalOctopole[1]*(-(sqrtSixTenths*vectorX.x*vectorX.x*vectorX.x)/4. + (3.0f*sqrtSixTenths*vectorX.x*vectorX.y*vectorX.y)/4. - (sqrtSixTenths*vectorX.x*vectorY.x*vectorY.x)/4. + (sqrtSixTenths*vectorX.y*vectorY.x*vectorY.y)/2. + (sqrtSixTenths*vectorX.x*vectorY.y*vectorY.y)/4. + sqrtSixTenths*vectorX.x*vectorZ.x*vectorZ.x - 2.0f*sqrtSixTenths*vectorX.y*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorX.x*vectorZ.y*vectorZ.y)
+                + sphericalOctopole[2]*(-(sqrtSixTenths*vectorX.x*vectorX.x*vectorY.x)/4. + (sqrtSixTenths*vectorX.y*vectorX.y*vectorY.x)/4. - (sqrtSixTenths*vectorY.x*vectorY.x*vectorY.x)/4. + (sqrtSixTenths*vectorX.x*vectorX.y*vectorY.y)/2. + (3.0f*sqrtSixTenths*vectorY.x*vectorY.y*vectorY.y)/4. + sqrtSixTenths*vectorY.x*vectorZ.x*vectorZ.x - 2.0f*sqrtSixTenths*vectorY.y*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorY.x*vectorZ.y*vectorZ.y)
+                + sphericalOctopole[3]*((sqrtThreeHalves*vectorX.x*vectorX.x*vectorZ.x)/2. - (sqrtThreeHalves*vectorX.y*vectorX.y*vectorZ.x)/2. - (sqrtThreeHalves*vectorY.x*vectorY.x*vectorZ.x)/2. + (sqrtThreeHalves*vectorY.y*vectorY.y*vectorZ.x)/2. - sqrtThreeHalves*vectorX.x*vectorX.y*vectorZ.y + sqrtThreeHalves*vectorY.x*vectorY.y*vectorZ.y)
+                + sphericalOctopole[4]*(sqrtThreeHalves*vectorX.x*vectorY.x*vectorZ.x - sqrtThreeHalves*vectorX.y*vectorY.y*vectorZ.x - sqrtThreeHalves*vectorX.y*vectorY.x*vectorZ.y - sqrtThreeHalves*vectorX.x*vectorY.y*vectorZ.y)
+                + sphericalOctopole[5]*(vectorX.x*vectorX.x*vectorX.x/4. - (3.0f*vectorX.x*vectorX.y*vectorX.y)/4. - (3.0f*vectorX.x*vectorY.x*vectorY.x)/4. + (3.0f*vectorX.y*vectorY.x*vectorY.y)/2. + (3.0f*vectorX.x*vectorY.y*vectorY.y)/4.)
+                + sphericalOctopole[6]*((3.0f*vectorX.x*vectorX.x*vectorY.x)/4. - (3.0f*vectorX.y*vectorX.y*vectorY.x)/4. - vectorY.x*vectorY.x*vectorY.x/4. - (3.0f*vectorX.x*vectorX.y*vectorY.y)/2. + (3.0f*vectorY.x*vectorY.y*vectorY.y)/4.);
+
+            rotatedOctopole[6] = 
+                  sphericalOctopole[0]* ((-3.0f*vectorX.x*vectorX.y*vectorZ.x)/sqrtTen - (3.0f*vectorY.x*vectorY.y*vectorZ.x)/sqrtTen - (3.0f*vectorX.x*vectorX.x*vectorZ.y)/(2.*sqrtTen) + (3.0f*vectorX.y*vectorX.y*vectorZ.y)/(2.*sqrtTen) - (3.0f*vectorY.x*vectorY.x*vectorZ.y)/(2.*sqrtTen) + (3.0f*vectorY.y*vectorY.y*vectorZ.y)/(2.*sqrtTen) + (3.0f*vectorZ.x*vectorZ.x*vectorZ.y)/sqrtTen - vectorZ.y*vectorZ.y*vectorZ.y/sqrtTen)
+                + sphericalOctopole[1]*((-3.0f*sqrtSixTenths*vectorX.x*vectorX.x*vectorX.y)/4. + (sqrtSixTenths*vectorX.y*vectorX.y*vectorX.y)/4. - (sqrtSixTenths*vectorX.y*vectorY.x*vectorY.x)/4. - (sqrtSixTenths*vectorX.x*vectorY.x*vectorY.y)/2. + (sqrtSixTenths*vectorX.y*vectorY.y*vectorY.y)/4. + sqrtSixTenths*vectorX.y*vectorZ.x*vectorZ.x + 2.0f*sqrtSixTenths*vectorX.x*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorX.y*vectorZ.y*vectorZ.y)
+                + sphericalOctopole[2]*(-(sqrtSixTenths*vectorX.x*vectorX.y*vectorY.x)/2. - (sqrtSixTenths*vectorX.x*vectorX.x*vectorY.y)/4. + (sqrtSixTenths*vectorX.y*vectorX.y*vectorY.y)/4. - (3.0f*sqrtSixTenths*vectorY.x*vectorY.x*vectorY.y)/4. + (sqrtSixTenths*vectorY.y*vectorY.y*vectorY.y)/4. + sqrtSixTenths*vectorY.y*vectorZ.x*vectorZ.x + 2.0f*sqrtSixTenths*vectorY.x*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorY.y*vectorZ.y*vectorZ.y)
+                + sphericalOctopole[3]*(sqrtThreeHalves*vectorX.x*vectorX.y*vectorZ.x - sqrtThreeHalves*vectorY.x*vectorY.y*vectorZ.x + (sqrtThreeHalves*vectorX.x*vectorX.x*vectorZ.y)/2. - (sqrtThreeHalves*vectorX.y*vectorX.y*vectorZ.y)/2. - (sqrtThreeHalves*vectorY.x*vectorY.x*vectorZ.y)/2. + (sqrtThreeHalves*vectorY.y*vectorY.y*vectorZ.y)/2.)
+                + sphericalOctopole[4]*(sqrtThreeHalves*vectorX.y*vectorY.x*vectorZ.x + sqrtThreeHalves*vectorX.x*vectorY.y*vectorZ.x + sqrtThreeHalves*vectorX.x*vectorY.x*vectorZ.y - sqrtThreeHalves*vectorX.y*vectorY.y*vectorZ.y)
+                + sphericalOctopole[5]*((3.0f*vectorX.x*vectorX.x*vectorX.y)/4. - vectorX.y*vectorX.y*vectorX.y/4. - (3.0f*vectorX.y*vectorY.x*vectorY.x)/4. - (3.0f*vectorX.x*vectorY.x*vectorY.y)/2. + (3.0f*vectorX.y*vectorY.y*vectorY.y)/4.)
+                + sphericalOctopole[6]*((3.0f*vectorX.x*vectorX.y*vectorY.x)/2. + (3.0f*vectorX.x*vectorX.x*vectorY.y)/4. - (3.0f*vectorX.y*vectorX.y*vectorY.y)/4. - (3.0f*vectorY.x*vectorY.x*vectorY.y)/4. + vectorY.y*vectorY.y*vectorY.y/4.);
+
+            sphericalOctopoles[offset+0] = rotatedOctopole[0];
+            sphericalOctopoles[offset+1] = rotatedOctopole[1];
+            sphericalOctopoles[offset+2] = rotatedOctopole[2];
+            sphericalOctopoles[offset+3] = rotatedOctopole[3];
+            sphericalOctopoles[offset+4] = rotatedOctopole[4];
+            sphericalOctopoles[offset+5] = rotatedOctopole[5];
+            sphericalOctopoles[offset+6] = rotatedOctopole[6];
         }
         else {
             labFrameDipoles[3*atom] = molecularDipoles[3*atom];
@@ -283,14 +451,18 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             labFrameQuadrupoles[5*atom+2] = molecularQuadrupoles[5*atom+2];
             labFrameQuadrupoles[5*atom+3] = molecularQuadrupoles[5*atom+3];
             labFrameQuadrupoles[5*atom+4] = molecularQuadrupoles[5*atom+4];
+            labFrameOctopoles[7*atom+0] = molecularOctopoles[7*atom+0];
+            labFrameOctopoles[7*atom+1] = molecularOctopoles[7*atom+1];
+            labFrameOctopoles[7*atom+2] = molecularOctopoles[7*atom+2];
+            labFrameOctopoles[7*atom+3] = molecularOctopoles[7*atom+3];
+            labFrameOctopoles[7*atom+4] = molecularOctopoles[7*atom+4];
+            labFrameOctopoles[7*atom+5] = molecularOctopoles[7*atom+5];
+            labFrameOctopoles[7*atom+6] = molecularOctopoles[7*atom+6];
         }
     }
 }
 
 extern "C" __global__ void recordInducedDipoles(const long long* __restrict__ fieldBuffers, const long long* __restrict__ fieldPolarBuffers,
-#ifdef USE_GK
-        const long long* __restrict__ gkFieldBuffers, real* __restrict__ inducedDipoleS, real* __restrict__ inducedDipolePolarS, 
-#endif
         real* __restrict__ inducedDipole, real* __restrict__ inducedDipolePolar, const float* __restrict__ polarizability) {
     for (int atom = blockIdx.x*blockDim.x+threadIdx.x; atom < NUM_ATOMS; atom += gridDim.x*blockDim.x) {
         real scale = polarizability[atom]/(real) 0x100000000;
@@ -300,14 +472,6 @@ extern "C" __global__ void recordInducedDipoles(const long long* __restrict__ fi
         inducedDipolePolar[3*atom] = scale*fieldPolarBuffers[atom];
         inducedDipolePolar[3*atom+1] = scale*fieldPolarBuffers[atom+PADDED_NUM_ATOMS];
         inducedDipolePolar[3*atom+2] = scale*fieldPolarBuffers[atom+PADDED_NUM_ATOMS*2];
-#ifdef USE_GK
-        inducedDipoleS[3*atom] = scale*(fieldBuffers[atom]+gkFieldBuffers[atom]);
-        inducedDipoleS[3*atom+1] = scale*(fieldBuffers[atom+PADDED_NUM_ATOMS]+gkFieldBuffers[atom+PADDED_NUM_ATOMS]);
-        inducedDipoleS[3*atom+2] = scale*(fieldBuffers[atom+PADDED_NUM_ATOMS*2]+gkFieldBuffers[atom+PADDED_NUM_ATOMS*2]);
-        inducedDipolePolarS[3*atom] = scale*(fieldPolarBuffers[atom]+gkFieldBuffers[atom]);
-        inducedDipolePolarS[3*atom+1] = scale*(fieldPolarBuffers[atom+PADDED_NUM_ATOMS]+gkFieldBuffers[atom+PADDED_NUM_ATOMS]);
-        inducedDipolePolarS[3*atom+2] = scale*(fieldPolarBuffers[atom+PADDED_NUM_ATOMS*2]+gkFieldBuffers[atom+PADDED_NUM_ATOMS*2]);
-#endif
     }
 }
 

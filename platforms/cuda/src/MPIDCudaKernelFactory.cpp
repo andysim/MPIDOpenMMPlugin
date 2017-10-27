@@ -48,17 +48,7 @@ extern "C" OPENMM_EXPORT void registerKernelFactories() {
     try {
         Platform& platform = Platform::getPlatformByName("CUDA");
         MPIDCudaKernelFactory* factory = new MPIDCudaKernelFactory();
-        platform.registerKernelFactory(CalcMPIDBondForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDAngleForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDInPlaneAngleForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDPiTorsionForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDStretchBendForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDOutOfPlaneBendForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDTorsionTorsionForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDMultipoleForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDGeneralizedKirkwoodForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDVdwForceKernel::Name(), factory);
-        platform.registerKernelFactory(CalcMPIDWcaDispersionForceKernel::Name(), factory);
+        platform.registerKernelFactory(CalcMPIDForceKernel::Name(), factory);
     }
     catch (...) {
         // Ignore.  The CUDA platform isn't available.
@@ -79,38 +69,8 @@ KernelImpl* MPIDCudaKernelFactory::createKernelImpl(std::string name, const Plat
     CudaPlatform::PlatformData& data = *static_cast<CudaPlatform::PlatformData*>(context.getPlatformData());
     CudaContext& cu = *data.contexts[0];
 
-    if (name == CalcMPIDBondForceKernel::Name())
-        return new CudaCalcMPIDBondForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDAngleForceKernel::Name())
-        return new CudaCalcMPIDAngleForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDInPlaneAngleForceKernel::Name())
-        return new CudaCalcMPIDInPlaneAngleForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDPiTorsionForceKernel::Name())
-        return new CudaCalcMPIDPiTorsionForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDStretchBendForceKernel::Name())
-        return new CudaCalcMPIDStretchBendForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDOutOfPlaneBendForceKernel::Name())
-        return new CudaCalcMPIDOutOfPlaneBendForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDTorsionTorsionForceKernel::Name())
-        return new CudaCalcMPIDTorsionTorsionForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDMultipoleForceKernel::Name())
-        return new CudaCalcMPIDMultipoleForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDGeneralizedKirkwoodForceKernel::Name())
-        return new CudaCalcMPIDGeneralizedKirkwoodForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDVdwForceKernel::Name())
-        return new CudaCalcMPIDVdwForceKernel(name, platform, cu, context.getSystem());
-
-    if (name == CalcMPIDWcaDispersionForceKernel::Name())
-        return new CudaCalcMPIDWcaDispersionForceKernel(name, platform, cu, context.getSystem());
+    if (name == CalcMPIDForceKernel::Name())
+        return new CudaCalcMPIDForceKernel(name, platform, cu, context.getSystem());
 
     throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
 }
