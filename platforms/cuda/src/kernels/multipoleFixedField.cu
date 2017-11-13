@@ -2,15 +2,21 @@
 
 typedef struct {
     real4 posq;
-    real3 field, fieldPolar, dipole;
+    real3 field, dipole;
 #ifdef INCLUDE_QUADRUPOLES
     real quadrupoleXX, quadrupoleXY, quadrupoleXZ;
     real quadrupoleYY, quadrupoleYZ, quadrupoleZZ;
 #endif
+#ifdef INCLUDE_OCTOPOLES
+    real octopoleXXX, octopoleXXY, octopoleXXZ, octopoleXYY, octopoleXYZ;
+    real octopoleXZZ, octopoleYYY, octopoleYYZ, octopoleYZZ, octopoleZZZ;
+#endif
     float thole, damp;
 } AtomData;
 
-inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __restrict__ posq, const real* __restrict__ labFrameDipole, const real* __restrict__ labFrameQuadrupole, const float2* __restrict__ dampingAndThole) {
+inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __restrict__ posq, const real* __restrict__ labFrameDipole,
+                                   const real* __restrict__ labFrameQuadrupole, const real* __restrict__ labFrameOctopole,
+                                   const float2* __restrict__ dampingAndThole) {
     data.posq = posq[atom];
     data.dipole.x = labFrameDipole[atom*3];
     data.dipole.y = labFrameDipole[atom*3+1];
@@ -23,13 +29,25 @@ inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __res
     data.quadrupoleYZ = labFrameQuadrupole[atom*5+4];
     data.quadrupoleZZ = -(data.quadrupoleXX+data.quadrupoleYY);
 #endif
+#ifdef INCLUDE_OCTOPOLES
+    data.octopoleXXX = labFrameOctopole[atom*7+0];
+    data.octopoleXXY = labFrameOctopole[atom*7+1];
+    data.octopoleXXZ = labFrameOctopole[atom*7+2];
+    data.octopoleXYY = labFrameOctopole[atom*7+3];
+    data.octopoleXYZ = labFrameOctopole[atom*7+4];
+    data.octopoleYYY = labFrameOctopole[atom*7+5];
+    data.octopoleYYZ = labFrameOctopole[atom*7+6];
+    data.octopoleXZZ = -data.octopoleXXX-data.octopoleXYY;
+    data.octopoleYZZ = -data.octopoleXXY-data.octopoleYYY;
+    data.octopoleZZZ = -data.octopoleXXZ-data.octopoleYYZ;
+#endif
     float2 temp = dampingAndThole[atom];
     data.damp = temp.x;
     data.thole = temp.y;
 }
 
 #ifdef USE_EWALD
-__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, float dScale, float pScale, real3* fields) {
+__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, float pScale, real3* fields) {
     real r2 = dot(deltaR, deltaR);
     if (r2 <= CUTOFF_SQUARED) {
         // calculate the error function damping terms
@@ -62,7 +80,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
         real scale3 = 1;
         real scale5 = 1;
         real scale7 = 1;
-        real damp = atom1.damp*atom2.damp;
+        real damp = std::abs(atom1.damp*atom2.damp);
         if (damp != 0) {
             real ratio = (r/damp);
             ratio = ratio*ratio*ratio;
@@ -75,9 +93,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
                 scale7 = 1 - expdamp*(1-damp+(0.6f*damp*damp));
             }
         }
-        real dsc3 = dScale*scale3;
-        real dsc5 = dScale*scale5;
-        real dsc7 = dScale*scale7;
 
         real psc3 = pScale*scale3;
         real psc5 = pScale*scale5;
@@ -86,9 +101,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
         real r3 = r*r2;
         real r5 = r3*r2;
         real r7 = r5*r2;
-        real drr3 = (1-dsc3)/r3;
-        real drr5 = 3*(1-dsc5)/r5;
-        real drr7 = 15*(1-dsc7)/r7;
 
         real prr3 = (1-psc3)/r3;
         real prr5 = 3*(1-psc5)/r5;
@@ -112,34 +124,26 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
 
         real3 fim = -deltaR*(bn1*atom2.posq.w-bn2*dkr+bn3*qkr) - bn1*atom2.dipole + 2*bn2*qk;
         real3 fkm = deltaR*(bn1*atom1.posq.w+bn2*dir+bn3*qir) - bn1*atom1.dipole - 2*bn2*qi;
-        real3 fid = -deltaR*(drr3*atom2.posq.w-drr5*dkr+drr7*qkr) - drr3*atom2.dipole + 2*drr5*qk;
-        real3 fkd = deltaR*(drr3*atom1.posq.w+drr5*dir+drr7*qir) - drr3*atom1.dipole - 2*drr5*qi;
         real3 fip = -deltaR*(prr3*atom2.posq.w-prr5*dkr+prr7*qkr) - prr3*atom2.dipole + 2*prr5*qk;
         real3 fkp = deltaR*(prr3*atom1.posq.w+prr5*dir+prr7*qir) - prr3*atom1.dipole - 2*prr5*qi;
 #else
         real3 fim = -deltaR*(bn1*atom2.posq.w-bn2*dkr) - bn1*atom2.dipole;
         real3 fkm = deltaR*(bn1*atom1.posq.w+bn2*dir) - bn1*atom1.dipole;
-        real3 fid = -deltaR*(drr3*atom2.posq.w-drr5*dkr) - drr3*atom2.dipole;
-        real3 fkd = deltaR*(drr3*atom1.posq.w+drr5*dir) - drr3*atom1.dipole;
         real3 fip = -deltaR*(prr3*atom2.posq.w-prr5*dkr) - prr3*atom2.dipole;
         real3 fkp = deltaR*(prr3*atom1.posq.w+prr5*dir) - prr3*atom1.dipole;
 #endif
         // increment the field at each site due to this interaction
 
-        fields[0] = fim-fid;
-        fields[1] = fim-fip;
-        fields[2] = fkm-fkd;
-        fields[3] = fkm-fkp;
+        fields[0] = fim-fip;
+        fields[1] = fkm-fkp;
     }
     else {
         fields[0] = make_real3(0);
         fields[1] = make_real3(0);
-        fields[2] = make_real3(0);
-        fields[3] = make_real3(0);
     }
 }
 #else
-__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, float dScale, float pScale, real3* fields) {
+__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, float pScale, real3* fields) {
     real rI = RSQRT(dot(deltaR, deltaR));
     real r = RECIP(rI);
     real r2I = rI*rI;
@@ -147,28 +151,29 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     real rr3 = rI*r2I;
     real rr5 = 3*rr3*r2I;
     real rr7 = 5*rr5*r2I;
+    real rr9 = 7*rr7*r2I;
  
     // get scaling factors, if needed
     
-    float damp = atom1.damp*atom2.damp;
+    float damp = std::abs(atom1.damp*atom2.damp);
     real dampExp;
     if (damp != 0) {
 
         // get scaling factors
       
         real ratio = r/damp;
-        float pGamma = atom2.thole > atom1.thole ? atom1.thole : atom2.thole; 
-        damp = ratio*ratio*ratio*pGamma;
+        float pGamma  = pScale == 0.0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
+        damp = ratio*pGamma;
         dampExp = EXP(-damp);
     }
     else
         dampExp = 0;
-      
-    rr3 *= 1 - dampExp;
-    rr5 *= 1 - (1+damp)*dampExp;
-    rr7 *= 1 - (1+damp+(0.6f*damp*damp))*dampExp;
-      
+    rr3 *= 1 - dampExp*(1 + damp + damp*damp/2);
+    rr5 *= 1 - dampExp*(1 + damp + damp*damp/2 + damp*damp*damp/6);
+    rr7 *= 1 - dampExp*(1 + damp + damp*damp/2 + damp*damp*damp/6 + damp*damp*damp*damp/30);
+    rr9 *= 1 - dampExp*(1 + damp + damp*damp/2 + damp*damp*damp/6 + 4*damp*damp*damp*damp/105 + damp*damp*damp*damp*damp/210);
     real rr5_2 = 2*rr5;
+    real rr7_3 = 3*rr7;
  
     real dir = dot(atom1.dipole, deltaR);
     real dkr = dot(atom2.dipole, deltaR);
@@ -190,45 +195,63 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     real3 field1 = deltaR*factor - rr3*atom2.dipole + rr5_2*qk;
     factor = rr3*atom1.posq.w + rr5*dir + rr7*qir;
     real3 field2 = deltaR*factor - rr3*atom1.dipole - rr5_2*qi;
+#ifdef INCLUDE_OCTOPOLES
+    real3 oxx = make_real3(atom2.octopoleXXX, atom2.octopoleXXY, atom2.octopoleXXZ);
+    real3 oxy = make_real3(atom2.octopoleXXY, atom2.octopoleXYY, atom2.octopoleXYZ);
+    real3 oxz = make_real3(atom2.octopoleXXZ, atom2.octopoleXYZ, atom2.octopoleXZZ);
+    real3 oyy = make_real3(atom2.octopoleXYY, atom2.octopoleYYY, atom2.octopoleYYZ);
+    real3 oyz = make_real3(atom2.octopoleXYZ, atom2.octopoleYYZ, atom2.octopoleYZZ);
+    real3 ozz = make_real3(atom2.octopoleXZZ, atom2.octopoleYZZ, atom2.octopoleZZZ);
+    real3 ox  = make_real3(dot(oxx,deltaR), dot(oxy,deltaR), dot(oxz,deltaR));
+    real3 oy  = make_real3(dot(oxy,deltaR), dot(oyy,deltaR), dot(oyz,deltaR));
+    real3 oz  = make_real3(dot(oxz,deltaR), dot(oyz,deltaR), dot(ozz,deltaR));
+    real3 o   = make_real3(dot(ox,deltaR), dot(oy,deltaR), dot(oz,deltaR));
+    field1 += deltaR*rr9*dot(o,deltaR) - o*rr7_3;
+    oxx = make_real3(atom1.octopoleXXX, atom1.octopoleXXY, atom1.octopoleXXZ);
+    oxy = make_real3(atom1.octopoleXXY, atom1.octopoleXYY, atom1.octopoleXYZ);
+    oxz = make_real3(atom1.octopoleXXZ, atom1.octopoleXYZ, atom1.octopoleXZZ);
+    oyy = make_real3(atom1.octopoleXYY, atom1.octopoleYYY, atom1.octopoleYYZ);
+    oyz = make_real3(atom1.octopoleXYZ, atom1.octopoleYYZ, atom1.octopoleYZZ);
+    ozz = make_real3(atom1.octopoleXZZ, atom1.octopoleYZZ, atom1.octopoleZZZ);
+    ox  = make_real3(dot(oxx,deltaR), dot(oxy,deltaR), dot(oxz,deltaR));
+    oy  = make_real3(dot(oxy,deltaR), dot(oyy,deltaR), dot(oyz,deltaR));
+    oz  = make_real3(dot(oxz,deltaR), dot(oyz,deltaR), dot(ozz,deltaR));
+    o   = make_real3(dot(ox,deltaR), dot(oy,deltaR), dot(oz,deltaR));
+    field2 += deltaR*rr9*dot(o,deltaR) - o*rr7_3;
+#endif
 #else
     real factor = -rr3*atom2.posq.w + rr5*dkr;
     real3 field1 = deltaR*factor - rr3*atom2.dipole;
     factor = rr3*atom1.posq.w + rr5*dir;
     real3 field2 = deltaR*factor - rr3*atom1.dipole;
 #endif
-    fields[0] = dScale*field1;
-    fields[1] = pScale*field1;
-    fields[2] = dScale*field2;
-    fields[3] = pScale*field2;
+    fields[0] = pScale*field1;
+    fields[1] = pScale*field2;
 }
 #endif
 
 
-__device__ real computeDScaleFactor(unsigned int polarizationGroup, int index) {
-    return (polarizationGroup & 1<<index ? 0 : 1);
-}
-
-__device__ float computePScaleFactor(uint2 covalent, unsigned int polarizationGroup, int index) {
+__device__ float computePScaleFactor(uint2 covalent, int index) {
     int mask = 1<<index;
     bool x = (covalent.x & mask);
     bool y = (covalent.y & mask);
-    bool p = (polarizationGroup & mask);
-    return (x && y ? 0.0f : (x && p ? 0.5f : 1.0f));
+    return (x && y ? 0.0f : 1.0f);
 }
 
 /**
  * Compute nonbonded interactions.
  */
 extern "C" __global__ void computeFixedField(
-        unsigned long long* __restrict__ fieldBuffers, unsigned long long* __restrict__ fieldPolarBuffers, const real4* __restrict__ posq,
-        const uint2* __restrict__ covalentFlags, const unsigned int* __restrict__ polarizationGroupFlags, const ushort2* __restrict__ exclusionTiles,
+        unsigned long long* __restrict__ fieldBuffers, const real4* __restrict__ posq,
+        const uint2* __restrict__ covalentFlags, const ushort2* __restrict__ exclusionTiles,
         unsigned int startTileIndex, unsigned int numTileIndices,
 #ifdef USE_CUTOFF
         const int* __restrict__ tiles, const unsigned int* __restrict__ interactionCount, real4 periodicBoxSize, real4 invPeriodicBoxSize,
         real4 periodicBoxVecX, real4 periodicBoxVecY, real4 periodicBoxVecZ, unsigned int maxTiles, const real4* __restrict__ blockCenter,
         const unsigned int* __restrict__ interactingAtoms,
 #endif
-        const real* __restrict__ labFrameDipole, const real* __restrict__ labFrameQuadrupole, const float2* __restrict__ dampingAndThole) {
+        const real* __restrict__ labFrameDipole, const real* __restrict__ labFrameQuadrupole, const real* __restrict__ labFrameOctopole,
+        const float2* __restrict__ dampingAndThole) {
     const unsigned int totalWarps = (blockDim.x*gridDim.x)/TILE_SIZE;
     const unsigned int warp = (blockIdx.x*blockDim.x+threadIdx.x)/TILE_SIZE;
     const unsigned int tgx = threadIdx.x & (TILE_SIZE-1);
@@ -236,7 +259,7 @@ extern "C" __global__ void computeFixedField(
     __shared__ AtomData localData[THREAD_BLOCK_SIZE];
 
     // First loop: process tiles that contain exclusions.
-    
+
     const unsigned int firstExclusionTile = FIRST_EXCLUSION_TILE+warp*(LAST_EXCLUSION_TILE-FIRST_EXCLUSION_TILE)/totalWarps;
     const unsigned int lastExclusionTile = FIRST_EXCLUSION_TILE+(warp+1)*(LAST_EXCLUSION_TILE-FIRST_EXCLUSION_TILE)/totalWarps;
     for (int pos = firstExclusionTile; pos < lastExclusionTile; pos++) {
@@ -245,11 +268,9 @@ extern "C" __global__ void computeFixedField(
         const unsigned int y = tileIndices.y;
         AtomData data;
         data.field = make_real3(0);
-        data.fieldPolar = make_real3(0);
         unsigned int atom1 = x*TILE_SIZE + tgx;
-        loadAtomData(data, atom1, posq, labFrameDipole, labFrameQuadrupole, dampingAndThole);
+        loadAtomData(data, atom1, posq, labFrameDipole, labFrameQuadrupole, labFrameOctopole, dampingAndThole);
         uint2 covalent = covalentFlags[pos*TILE_SIZE+tgx];
-        unsigned int polarizationGroup = polarizationGroupFlags[pos*TILE_SIZE+tgx];
         if (x == y) {
             // This tile is on the diagonal.
 
@@ -264,6 +285,18 @@ extern "C" __global__ void computeFixedField(
             localData[localAtomIndex].quadrupoleYZ = data.quadrupoleYZ;
             localData[localAtomIndex].quadrupoleZZ = data.quadrupoleZZ;
 #endif
+#ifdef INCLUDE_OCTOPOLES
+            localData[localAtomIndex].octopoleXXX = data.octopoleXXX;
+            localData[localAtomIndex].octopoleXXY = data.octopoleXXY;
+            localData[localAtomIndex].octopoleXXZ = data.octopoleXXZ;
+            localData[localAtomIndex].octopoleXYY = data.octopoleXYY;
+            localData[localAtomIndex].octopoleXYZ = data.octopoleXYZ;
+            localData[localAtomIndex].octopoleXZZ = data.octopoleXZZ;
+            localData[localAtomIndex].octopoleYYY = data.octopoleYYY;
+            localData[localAtomIndex].octopoleYYZ = data.octopoleYYZ;
+            localData[localAtomIndex].octopoleYZZ = data.octopoleYZZ;
+            localData[localAtomIndex].octopoleZZZ = data.octopoleZZZ;
+#endif
             localData[localAtomIndex].thole = data.thole;
             localData[localAtomIndex].damp = data.damp;
             for (unsigned int j = 0; j < TILE_SIZE; j++) {
@@ -273,12 +306,10 @@ extern "C" __global__ void computeFixedField(
 #endif
                 int atom2 = y*TILE_SIZE+j;
                 if (atom1 != atom2 && atom1 < NUM_ATOMS && atom2 < NUM_ATOMS) {
-                    real3 fields[4];
-                    float d = computeDScaleFactor(polarizationGroup, j);
-                    float p = computePScaleFactor(covalent, polarizationGroup, j);
-                    computeOneInteraction(data, localData[tbx+j], delta, d, p, fields);
+                    real3 fields[2];
+                    float p = computePScaleFactor(covalent, j);
+                    computeOneInteraction(data, localData[tbx+j], delta, p, fields);
                     data.field += fields[0];
-                    data.fieldPolar += fields[1];
                 }
             }
         }
@@ -287,9 +318,8 @@ extern "C" __global__ void computeFixedField(
 
             const unsigned int localAtomIndex = threadIdx.x;
             unsigned int j = y*TILE_SIZE + tgx;
-            loadAtomData(localData[localAtomIndex], j, posq, labFrameDipole, labFrameQuadrupole, dampingAndThole);
+            loadAtomData(localData[localAtomIndex], j, posq, labFrameDipole, labFrameQuadrupole, labFrameOctopole, dampingAndThole);
             localData[localAtomIndex].field = make_real3(0);
-            localData[localAtomIndex].fieldPolar = make_real3(0);
             unsigned int tj = tgx;
             for (j = 0; j < TILE_SIZE; j++) {
                 real3 delta = trimTo3(localData[tbx+tj].posq-data.posq);
@@ -298,14 +328,11 @@ extern "C" __global__ void computeFixedField(
 #endif
                 int atom2 = y*TILE_SIZE+tj;
                 if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS) {
-                    real3 fields[4];
-                    float d = computeDScaleFactor(polarizationGroup, tj);
-                    float p = computePScaleFactor(covalent, polarizationGroup, tj);
-                    computeOneInteraction(data, localData[tbx+tj], delta, d, p, fields);
+                    real3 fields[2];
+                    float p = computePScaleFactor(covalent, tj);
+                    computeOneInteraction(data, localData[tbx+tj], delta, p, fields);
                     data.field += fields[0];
-                    data.fieldPolar += fields[1];
-                    localData[tbx+tj].field += fields[2];
-                    localData[tbx+tj].fieldPolar += fields[3];
+                    localData[tbx+tj].field += fields[1];
                 }
                 tj = (tj + 1) & (TILE_SIZE - 1);
             }
@@ -317,17 +344,11 @@ extern "C" __global__ void computeFixedField(
         atomicAdd(&fieldBuffers[offset], static_cast<unsigned long long>((long long) (data.field.x*0x100000000)));
         atomicAdd(&fieldBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.field.y*0x100000000)));
         atomicAdd(&fieldBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.field.z*0x100000000)));
-        atomicAdd(&fieldPolarBuffers[offset], static_cast<unsigned long long>((long long) (data.fieldPolar.x*0x100000000)));
-        atomicAdd(&fieldPolarBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.fieldPolar.y*0x100000000)));
-        atomicAdd(&fieldPolarBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.fieldPolar.z*0x100000000)));
         if (x != y) {
             offset = y*TILE_SIZE + tgx;
             atomicAdd(&fieldBuffers[offset], static_cast<unsigned long long>((long long) (localData[threadIdx.x].field.x*0x100000000)));
             atomicAdd(&fieldBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].field.y*0x100000000)));
             atomicAdd(&fieldBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].field.z*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset], static_cast<unsigned long long>((long long) (localData[threadIdx.x].fieldPolar.x*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].fieldPolar.y*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].fieldPolar.z*0x100000000)));
         }
     }
 
@@ -390,8 +411,7 @@ extern "C" __global__ void computeFixedField(
 
             AtomData data;
             data.field = make_real3(0);
-            data.fieldPolar = make_real3(0);
-            loadAtomData(data, atom1, posq, labFrameDipole, labFrameQuadrupole, dampingAndThole);
+            loadAtomData(data, atom1, posq, labFrameDipole, labFrameQuadrupole, labFrameOctopole, dampingAndThole);
 #ifdef USE_CUTOFF
             unsigned int j = interactingAtoms[pos*TILE_SIZE+tgx];
 #else
@@ -399,9 +419,8 @@ extern "C" __global__ void computeFixedField(
 #endif
             atomIndices[threadIdx.x] = j;
             const unsigned int localAtomIndex = threadIdx.x;
-            loadAtomData(localData[localAtomIndex], j, posq, labFrameDipole, labFrameQuadrupole, dampingAndThole);
+            loadAtomData(localData[localAtomIndex], j, posq, labFrameDipole, labFrameQuadrupole, labFrameOctopole, dampingAndThole);
             localData[localAtomIndex].field = make_real3(0);
-            localData[localAtomIndex].fieldPolar = make_real3(0);
 
             // Compute the full set of interactions in this tile.
 
@@ -413,12 +432,10 @@ extern "C" __global__ void computeFixedField(
 #endif
                 int atom2 = atomIndices[tbx+tj];
                 if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS) {
-                    real3 fields[4];
-                    computeOneInteraction(data, localData[tbx+tj], delta, 1, 1, fields);
+                    real3 fields[2];
+                    computeOneInteraction(data, localData[tbx+tj], delta, 1, fields);
                     data.field += fields[0];
-                    data.fieldPolar += fields[1];
-                    localData[tbx+tj].field += fields[2];
-                    localData[tbx+tj].fieldPolar += fields[3];
+                    localData[tbx+tj].field += fields[1];
                 }
                 tj = (tj + 1) & (TILE_SIZE - 1);
             }
@@ -429,9 +446,6 @@ extern "C" __global__ void computeFixedField(
             atomicAdd(&fieldBuffers[offset], static_cast<unsigned long long>((long long) (data.field.x*0x100000000)));
             atomicAdd(&fieldBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.field.y*0x100000000)));
             atomicAdd(&fieldBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.field.z*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset], static_cast<unsigned long long>((long long) (data.fieldPolar.x*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.fieldPolar.y*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.fieldPolar.z*0x100000000)));
 #ifdef USE_CUTOFF
             offset = atomIndices[threadIdx.x];
 #else
@@ -440,9 +454,6 @@ extern "C" __global__ void computeFixedField(
             atomicAdd(&fieldBuffers[offset], static_cast<unsigned long long>((long long) (localData[threadIdx.x].field.x*0x100000000)));
             atomicAdd(&fieldBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].field.y*0x100000000)));
             atomicAdd(&fieldBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].field.z*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset], static_cast<unsigned long long>((long long) (localData[threadIdx.x].fieldPolar.x*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].fieldPolar.y*0x100000000)));
-            atomicAdd(&fieldPolarBuffers[offset+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (localData[threadIdx.x].fieldPolar.z*0x100000000)));
         }
         pos++;
     }

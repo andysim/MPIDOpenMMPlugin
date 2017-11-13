@@ -2,66 +2,64 @@
 
 typedef struct {
     real3 pos;
-    real3 field, fieldPolar, inducedDipole, inducedDipolePolar;
+    real3 field, inducedDipole;
 #ifdef EXTRAPOLATED_POLARIZATION
-    real fieldGradient[6], fieldGradientPolar[6];
+    real fieldGradient[6];
 #endif
     float thole, damp;
 } AtomData;
 
 inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __restrict__ posq, const real* __restrict__ inducedDipole,
-        const real* __restrict__ inducedDipolePolar, const float2* __restrict__ dampingAndThole) {
+        const float2* __restrict__ dampingAndThole) {
     real4 atomPosq = posq[atom];
     data.pos = make_real3(atomPosq.x, atomPosq.y, atomPosq.z);
     data.inducedDipole.x = inducedDipole[atom*3];
     data.inducedDipole.y = inducedDipole[atom*3+1];
     data.inducedDipole.z = inducedDipole[atom*3+2];
-    data.inducedDipolePolar.x = inducedDipolePolar[atom*3];
-    data.inducedDipolePolar.y = inducedDipolePolar[atom*3+1];
-    data.inducedDipolePolar.z = inducedDipolePolar[atom*3+2];
     float2 temp = dampingAndThole[atom];
-    data.damp = temp.x;
+    data.damp = std::abs(temp.x);
     data.thole = temp.y;
+}
+
+__device__ float computePScaleFactor(uint2 covalent, int index) {
+    int mask = 1<<index;
+    bool x = (covalent.x & mask);
+    bool y = (covalent.y & mask);
+    return (x && y ? 0.0f : 1.0f);
 }
 
 inline __device__ void zeroAtomData(AtomData& data) {
     data.field = make_real3(0);
-    data.fieldPolar = make_real3(0);
 #ifdef EXTRAPOLATED_POLARIZATION
     for (int i = 0; i < 6; i++) {
         data.fieldGradient[i] = 0;
-        data.fieldGradientPolar[i] = 0;
     }
 #endif
 }
 
 #ifdef EXTRAPOLATED_POLARIZATION
-    #define SAVE_ATOM_DATA(index, data) saveAtomData(index, data, field, fieldPolar, fieldGradient, fieldGradientPolar);
+    #define SAVE_ATOM_DATA(index, data) saveAtomData(index, data, field, fieldGradient);
 #else
-    #define SAVE_ATOM_DATA(index, data) saveAtomData(index, data, field, fieldPolar);
+    #define SAVE_ATOM_DATA(index, data) saveAtomData(index, data, field);
 #endif
 
-inline __device__ void saveAtomData(int index, AtomData& data, unsigned long long* __restrict__ field, unsigned long long* __restrict__ fieldPolar
+inline __device__ void saveAtomData(int index, AtomData& data, unsigned long long* __restrict__ field
 #ifdef EXTRAPOLATED_POLARIZATION
-        , unsigned long long* __restrict__ fieldGradient, unsigned long long* __restrict__ fieldGradientPolar
+        , unsigned long long* __restrict__ fieldGradient
 #endif
         ) {
     atomicAdd(&field[index], static_cast<unsigned long long>((long long) (data.field.x*0x100000000)));
     atomicAdd(&field[index+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.field.y*0x100000000)));
     atomicAdd(&field[index+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.field.z*0x100000000)));
-    atomicAdd(&fieldPolar[index], static_cast<unsigned long long>((long long) (data.fieldPolar.x*0x100000000)));
-    atomicAdd(&fieldPolar[index+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.fieldPolar.y*0x100000000)));
-    atomicAdd(&fieldPolar[index+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (data.fieldPolar.z*0x100000000)));
 #ifdef EXTRAPOLATED_POLARIZATION
     for (int i = 0; i < 6; i++) {
         atomicAdd(&fieldGradient[6*index+i], static_cast<unsigned long long>((long long) (data.fieldGradient[i]*0x100000000)));
-        atomicAdd(&fieldGradientPolar[6*index+i], static_cast<unsigned long long>((long long) (data.fieldGradientPolar[i]*0x100000000)));
     }
 #endif
 }
 
 #ifdef USE_EWALD
-__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, bool isSelfInteraction) {
+__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, float pScale, bool isSelfInteraction) {
     if (isSelfInteraction)
         return;
     real scale1, scale2, scale3;
@@ -99,15 +97,14 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
 
         // compute the error function scaled and unscaled terms
 
-        real damp = atom1.damp*atom2.damp;
+        real damp = std::abs(atom1.damp*atom2.damp);
         real ratio = (r/damp);
-        ratio = ratio*ratio*ratio;
-        float pgamma = atom1.thole < atom2.thole ? atom1.thole : atom2.thole;
-        damp = damp == 0 ? 0 : -pgamma*ratio;
-        real expdamp = EXP(damp);
-        real dsc3 = 1 - expdamp;
-        real dsc5 = 1 - expdamp*(1-damp);
-        real dsc7 = 1 - (1-damp+(0.6f*damp*damp))*expdamp;
+        float pgamma = pScale == 0.0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
+        damp = damp == 0 ? 0 : pgamma*ratio;
+        real expdamp = EXP(-damp);
+        real dsc3 = 1 - expdamp*(1 + damp + damp*damp/2);
+        real dsc5 = 1 - expdamp*(1 + damp + damp*damp/2 + damp*damp*damp/6);
+        real dsc7 = 1 - expdamp*(1 + damp + damp*damp/2 + damp*damp*damp/6 + damp*damp*damp*damp/30);
         real r3 = (r*r2);
         real r5 = (r3*r2);
         real r7 = (r5*r2);
@@ -126,12 +123,8 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     }
     real dDotDelta = scale2*dot(deltaR, atom2.inducedDipole);
     atom1.field += scale1*atom2.inducedDipole + dDotDelta*deltaR;
-    dDotDelta = scale2*dot(deltaR, atom2.inducedDipolePolar);
-    atom1.fieldPolar += scale1*atom2.inducedDipolePolar + dDotDelta*deltaR;
     dDotDelta = scale2*dot(deltaR, atom1.inducedDipole);
     atom2.field += scale1*atom1.inducedDipole + dDotDelta*deltaR;
-    dDotDelta = scale2*dot(deltaR, atom1.inducedDipolePolar);
-    atom2.fieldPolar += scale1*atom1.inducedDipolePolar + dDotDelta*deltaR;
 #ifdef EXTRAPOLATED_POLARIZATION
     // Compute and store the field gradients for later use.
     
@@ -144,15 +137,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     atom2.fieldGradient[4] -= muDotR*deltaR.x*deltaR.z*scale3 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*scale2;
     atom2.fieldGradient[5] -= muDotR*deltaR.y*deltaR.z*scale3 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*scale2;
 
-    dipole = atom1.inducedDipolePolar;
-    muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
-    atom2.fieldGradientPolar[0] -= muDotR*deltaR.x*deltaR.x*scale3 - (2*dipole.x*deltaR.x + muDotR)*scale2;
-    atom2.fieldGradientPolar[1] -= muDotR*deltaR.y*deltaR.y*scale3 - (2*dipole.y*deltaR.y + muDotR)*scale2;
-    atom2.fieldGradientPolar[2] -= muDotR*deltaR.z*deltaR.z*scale3 - (2*dipole.z*deltaR.z + muDotR)*scale2;
-    atom2.fieldGradientPolar[3] -= muDotR*deltaR.x*deltaR.y*scale3 - (dipole.x*deltaR.y + dipole.y*deltaR.x)*scale2;
-    atom2.fieldGradientPolar[4] -= muDotR*deltaR.x*deltaR.z*scale3 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*scale2;
-    atom2.fieldGradientPolar[5] -= muDotR*deltaR.y*deltaR.z*scale3 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*scale2;
-
     dipole = atom2.inducedDipole;
     muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
     atom1.fieldGradient[0] += muDotR*deltaR.x*deltaR.x*scale3 - (2*dipole.x*deltaR.x + muDotR)*scale2;
@@ -161,18 +145,12 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     atom1.fieldGradient[3] += muDotR*deltaR.x*deltaR.y*scale3 - (dipole.x*deltaR.y + dipole.y*deltaR.x)*scale2;
     atom1.fieldGradient[4] += muDotR*deltaR.x*deltaR.z*scale3 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*scale2;
     atom1.fieldGradient[5] += muDotR*deltaR.y*deltaR.z*scale3 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*scale2;
-
-    dipole = atom2.inducedDipolePolar;
-    muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
-    atom1.fieldGradientPolar[0] += muDotR*deltaR.x*deltaR.x*scale3 - (2*dipole.x*deltaR.x + muDotR)*scale2;
-    atom1.fieldGradientPolar[1] += muDotR*deltaR.y*deltaR.y*scale3 - (2*dipole.y*deltaR.y + muDotR)*scale2;
-    atom1.fieldGradientPolar[2] += muDotR*deltaR.z*deltaR.z*scale3 - (2*dipole.z*deltaR.z + muDotR)*scale2;
-    atom1.fieldGradientPolar[3] += muDotR*deltaR.x*deltaR.y*scale3 - (dipole.x*deltaR.y + dipole.y*deltaR.x)*scale2;
-    atom1.fieldGradientPolar[4] += muDotR*deltaR.x*deltaR.z*scale3 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*scale2;
-    atom1.fieldGradientPolar[5] += muDotR*deltaR.y*deltaR.z*scale3 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*scale2;
 #endif
 }
-__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, bool isSelfInteraction) {
+
+#else
+
+__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 deltaR, float pScale, bool isSelfInteraction) {
     if (isSelfInteraction)
         return;
     real rI = RSQRT(dot(deltaR, deltaR));
@@ -181,25 +159,20 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     real rr3 = -rI*r2I;
     real rr5 = -3*rr3*r2I;
     real rr7 = 5*rr5*r2I;
-    real dampProd = atom1.damp*atom2.damp;
+    real dampProd = std::abs(atom1.damp*atom2.damp);
     real ratio = (dampProd != 0 ? r/dampProd : 1);
-    float pGamma = (atom2.thole > atom1.thole ? atom1.thole: atom2.thole);
-    real damp = ratio*ratio*ratio*pGamma;
+    float pGamma  = pScale == 0.0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
+    real damp = ratio*pGamma;
     real dampExp = (dampProd != 0 ? EXP(-damp) : 0); 
-    rr3 *= 1 - dampExp;
-    rr5 *= 1 - (1+damp)*dampExp;
-    rr7 *= 1 - (1+damp+(0.6f*damp*damp))*dampExp;
+    rr3 *= 1 - dampExp*(1 + damp + damp*damp/2);
+    rr5 *= 1 - dampExp*(1 + damp + damp*damp/2 + damp*damp*damp/6);
+    rr7 *= 1 - dampExp*(1 + damp + damp*damp/2 + damp*damp*damp/6 + damp*damp*damp*damp/30);
     real dDotDelta = rr5*dot(deltaR, atom2.inducedDipole);
     atom1.field += rr3*atom2.inducedDipole + dDotDelta*deltaR;
-    dDotDelta = rr5*dot(deltaR, atom2.inducedDipolePolar);
-    atom1.fieldPolar += rr3*atom2.inducedDipolePolar + dDotDelta*deltaR;
     dDotDelta = rr5*dot(deltaR, atom1.inducedDipole);
     atom2.field += rr3*atom1.inducedDipole + dDotDelta*deltaR;
-    dDotDelta = rr5*dot(deltaR, atom1.inducedDipolePolar);
-    atom2.fieldPolar += rr3*atom1.inducedDipolePolar + dDotDelta*deltaR;
 #ifdef EXTRAPOLATED_POLARIZATION
     // Compute and store the field gradients for later use.
-    
     real3 dipole = atom1.inducedDipole;
     real muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
     atom2.fieldGradient[0] -= muDotR*deltaR.x*deltaR.x*rr7 - (2*dipole.x*deltaR.x + muDotR)*rr5;
@@ -209,15 +182,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     atom2.fieldGradient[4] -= muDotR*deltaR.x*deltaR.z*rr7 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*rr5;
     atom2.fieldGradient[5] -= muDotR*deltaR.y*deltaR.z*rr7 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*rr5;
 
-    dipole = atom1.inducedDipolePolar;
-    muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
-    atom2.fieldGradientPolar[0] -= muDotR*deltaR.x*deltaR.x*rr7 - (2*dipole.x*deltaR.x + muDotR)*rr5;
-    atom2.fieldGradientPolar[1] -= muDotR*deltaR.y*deltaR.y*rr7 - (2*dipole.y*deltaR.y + muDotR)*rr5;
-    atom2.fieldGradientPolar[2] -= muDotR*deltaR.z*deltaR.z*rr7 - (2*dipole.z*deltaR.z + muDotR)*rr5;
-    atom2.fieldGradientPolar[3] -= muDotR*deltaR.x*deltaR.y*rr7 - (dipole.x*deltaR.y + dipole.y*deltaR.x)*rr5;
-    atom2.fieldGradientPolar[4] -= muDotR*deltaR.x*deltaR.z*rr7 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*rr5;
-    atom2.fieldGradientPolar[5] -= muDotR*deltaR.y*deltaR.z*rr7 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*rr5;
-
     dipole = atom2.inducedDipole;
     muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
     atom1.fieldGradient[0] += muDotR*deltaR.x*deltaR.x*rr7 - (2*dipole.x*deltaR.x + muDotR)*rr5;
@@ -226,15 +190,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     atom1.fieldGradient[3] += muDotR*deltaR.x*deltaR.y*rr7 - (dipole.x*deltaR.y + dipole.y*deltaR.x)*rr5;
     atom1.fieldGradient[4] += muDotR*deltaR.x*deltaR.z*rr7 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*rr5;
     atom1.fieldGradient[5] += muDotR*deltaR.y*deltaR.z*rr7 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*rr5;
-
-    dipole = atom2.inducedDipolePolar;
-    muDotR = dipole.x*deltaR.x + dipole.y*deltaR.y + dipole.z*deltaR.z;
-    atom1.fieldGradientPolar[0] += muDotR*deltaR.x*deltaR.x*rr7 - (2*dipole.x*deltaR.x + muDotR)*rr5;
-    atom1.fieldGradientPolar[1] += muDotR*deltaR.y*deltaR.y*rr7 - (2*dipole.y*deltaR.y + muDotR)*rr5;
-    atom1.fieldGradientPolar[2] += muDotR*deltaR.z*deltaR.z*rr7 - (2*dipole.z*deltaR.z + muDotR)*rr5;
-    atom1.fieldGradientPolar[3] += muDotR*deltaR.x*deltaR.y*rr7 - (dipole.x*deltaR.y + dipole.y*deltaR.x)*rr5;
-    atom1.fieldGradientPolar[4] += muDotR*deltaR.x*deltaR.z*rr7 - (dipole.x*deltaR.z + dipole.z*deltaR.x)*rr5;
-    atom1.fieldGradientPolar[5] += muDotR*deltaR.y*deltaR.z*rr7 - (dipole.y*deltaR.z + dipole.z*deltaR.y)*rr5;
 #endif
 }
 #endif
@@ -243,10 +198,10 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
  * Compute the mutual induced field.
  */
 extern "C" __global__ void computeInducedField(
-        unsigned long long* __restrict__ field, unsigned long long* __restrict__ fieldPolar, const real4* __restrict__ posq, const ushort2* __restrict__ exclusionTiles, 
-        const real* __restrict__ inducedDipole, const real* __restrict__ inducedDipolePolar, unsigned int startTileIndex, unsigned int numTileIndices,
+        unsigned long long* __restrict__ field, const real4* __restrict__ posq, const uint2* __restrict__ covalentFlags, const ushort2* __restrict__ exclusionTiles, 
+        const real* __restrict__ inducedDipole, unsigned int startTileIndex, unsigned int numTileIndices,
 #ifdef EXTRAPOLATED_POLARIZATION
-        unsigned long long* __restrict__ fieldGradient, unsigned long long* __restrict__ fieldGradientPolar,
+        unsigned long long* __restrict__ fieldGradient,
 #endif
 #ifdef USE_CUTOFF
         const int* __restrict__ tiles, const unsigned int* __restrict__ interactionCount, real4 periodicBoxSize, real4 invPeriodicBoxSize,
@@ -270,13 +225,13 @@ extern "C" __global__ void computeInducedField(
         AtomData data;
         zeroAtomData(data);
         unsigned int atom1 = x*TILE_SIZE + tgx;
-        loadAtomData(data, atom1, posq, inducedDipole, inducedDipolePolar, dampingAndThole);
+        loadAtomData(data, atom1, posq, inducedDipole, dampingAndThole);
+        uint2 covalent = covalentFlags[pos*TILE_SIZE+tgx];
         if (x == y) {
             // This tile is on the diagonal.
 
             localData[threadIdx.x].pos = data.pos;
             localData[threadIdx.x].inducedDipole = data.inducedDipole;
-            localData[threadIdx.x].inducedDipolePolar = data.inducedDipolePolar;
             localData[threadIdx.x].thole = data.thole;
             localData[threadIdx.x].damp = data.damp;
             for (unsigned int j = 0; j < TILE_SIZE; j++) {
@@ -285,14 +240,16 @@ extern "C" __global__ void computeInducedField(
                 APPLY_PERIODIC_TO_DELTA(delta)
 #endif
                 int atom2 = y*TILE_SIZE+j;
-                if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS)
-                    computeOneInteraction(data, localData[tbx+j], delta, atom1 == atom2);
+                if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS){
+                    float p = computePScaleFactor(covalent, j);
+                    computeOneInteraction(data, localData[tbx+j], delta, p, atom1 == atom2);
+                }
             }
         }
         else {
             // This is an off-diagonal tile.
 
-            loadAtomData(localData[threadIdx.x], y*TILE_SIZE+tgx, posq, inducedDipole, inducedDipolePolar, dampingAndThole);
+            loadAtomData(localData[threadIdx.x], y*TILE_SIZE+tgx, posq, inducedDipole, dampingAndThole);
             zeroAtomData(localData[threadIdx.x]);
             unsigned int tj = tgx;
             for (unsigned int j = 0; j < TILE_SIZE; j++) {
@@ -301,8 +258,10 @@ extern "C" __global__ void computeInducedField(
                 APPLY_PERIODIC_TO_DELTA(delta)
 #endif
                 int atom2 = y*TILE_SIZE+j;
-                if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS)
-                    computeOneInteraction(data, localData[tbx+tj], delta, false);
+                if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS){
+                    float p = computePScaleFactor(covalent, tj);
+                    computeOneInteraction(data, localData[tbx+tj], delta, p, false);
+                }
                 tj = (tj + 1) & (TILE_SIZE - 1);
             }
         }
@@ -376,14 +335,14 @@ extern "C" __global__ void computeInducedField(
 
             AtomData data;
             zeroAtomData(data);
-            loadAtomData(data, atom1, posq, inducedDipole, inducedDipolePolar, dampingAndThole);
+            loadAtomData(data, atom1, posq, inducedDipole, dampingAndThole);
 #ifdef USE_CUTOFF
             unsigned int j = interactingAtoms[pos*TILE_SIZE+tgx];
 #else
             unsigned int j = y*TILE_SIZE + tgx;
 #endif
             atomIndices[threadIdx.x] = j;
-            loadAtomData(localData[threadIdx.x], j, posq, inducedDipole, inducedDipolePolar, dampingAndThole);
+            loadAtomData(localData[threadIdx.x], j, posq, inducedDipole, dampingAndThole);
             zeroAtomData(localData[threadIdx.x]);
 
             // Compute the full set of interactions in this tile.
@@ -396,7 +355,7 @@ extern "C" __global__ void computeInducedField(
 #endif
                 int atom2 = atomIndices[tbx+tj];
                 if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS)
-                    computeOneInteraction(data, localData[tbx+tj], delta, false);
+                    computeOneInteraction(data, localData[tbx+tj], delta, 1, false);
                 tj = (tj + 1) & (TILE_SIZE - 1);
             }
 
@@ -415,113 +374,65 @@ extern "C" __global__ void computeInducedField(
     }
 }
 
-extern "C" __global__ void updateInducedFieldBySOR(const long long* __restrict__ fixedField, const long long* __restrict__ fixedFieldPolar,
-        const long long* __restrict__ fixedFieldS, const long long* __restrict__ inducedField, const long long* __restrict__ inducedFieldPolar,
-        real* __restrict__ inducedDipole, real* __restrict__ inducedDipolePolar, const float* __restrict__ polarizability, float2* __restrict__ errors) {
-    extern __shared__ real2 buffer[];
-    const float polarSOR = 0.55f;
-#ifdef USE_EWALD
-    const real ewaldScale = (4/(real) 3)*(EWALD_ALPHA*EWALD_ALPHA*EWALD_ALPHA)/SQRT_PI;
-#else
-    const real ewaldScale = 0;
-#endif
-    const real fieldScale = 1/(real) 0x100000000;
-    real sumErrors = 0;
-    real sumPolarErrors = 0;
-    for (int atom = blockIdx.x*blockDim.x + threadIdx.x; atom < NUM_ATOMS; atom += blockDim.x*gridDim.x) {
-        real scale = polarizability[atom];
-        for (int component = 0; component < 3; component++) {
-            int dipoleIndex = 3*atom+component;
-            int fieldIndex = atom+component*PADDED_NUM_ATOMS;
-            real previousDipole = inducedDipole[dipoleIndex];
-            real previousDipolePolar = inducedDipolePolar[dipoleIndex];
-            long long fixedS = (fixedFieldS == NULL ? (long long) 0 : fixedFieldS[fieldIndex]);
-            real newDipole = scale*((fixedField[fieldIndex]+fixedS+inducedField[fieldIndex])*fieldScale+ewaldScale*previousDipole);
-            real newDipolePolar = scale*((fixedFieldPolar[fieldIndex]+fixedS+inducedFieldPolar[fieldIndex])*fieldScale+ewaldScale*previousDipolePolar);
-            newDipole = previousDipole + polarSOR*(newDipole-previousDipole);
-            newDipolePolar = previousDipolePolar + polarSOR*(newDipolePolar-previousDipolePolar);
-            inducedDipole[dipoleIndex] = newDipole;
-            inducedDipolePolar[dipoleIndex] = newDipolePolar;
-            sumErrors += (newDipole-previousDipole)*(newDipole-previousDipole);
-            sumPolarErrors += (newDipolePolar-previousDipolePolar)*(newDipolePolar-previousDipolePolar);
-        }
-    }
-    
-    // Sum the errors over threads and store the total for this block.
-    
-    buffer[threadIdx.x] = make_real2(sumErrors, sumPolarErrors);
-    __syncthreads();
-    for (int offset = 1; offset < blockDim.x; offset *= 2) {
-        if (threadIdx.x+offset < blockDim.x && (threadIdx.x&(2*offset-1)) == 0) {
-            buffer[threadIdx.x].x += buffer[threadIdx.x+offset].x;
-            buffer[threadIdx.x].y += buffer[threadIdx.x+offset].y;
-        }
-        __syncthreads();
-    }
-    if (threadIdx.x == 0)
-        errors[blockIdx.x] = make_float2((float) buffer[0].x, (float) buffer[0].y);
-}
 
-extern "C" __global__ void recordInducedDipolesForDIIS(const long long* __restrict__ fixedField, const long long* __restrict__ fixedFieldPolar,
-        const long long* __restrict__ fixedFieldS, const long long* __restrict__ inducedField, const long long* __restrict__ inducedFieldPolar,
-        const real* __restrict__ inducedDipole, const real* __restrict__ inducedDipolePolar, const float* __restrict__ polarizability, float2* __restrict__ errors,
-        real* __restrict__ prevDipoles, real* __restrict__ prevDipolesPolar, real* __restrict__ prevErrors, int iteration, bool recordPrevErrors, real* __restrict__ matrix) {
-    extern __shared__ real2 buffer[];
+extern "C" __global__ void recordInducedDipolesForDIIS(const long long* __restrict__ fixedField, const long long* __restrict__ inducedField,
+        const real* __restrict__ inducedDipole, const real* __restrict__ labFramePolarizabilities, float* __restrict__ errors,
+        real* __restrict__ prevDipoles, real* __restrict__ prevErrors, int iteration, bool recordPrevErrors, real* __restrict__ matrix) {
+    extern __shared__ real buffer[];
     const real fieldScale = 1/(real) 0x100000000;
     real sumErrors = 0;
-    real sumPolarErrors = 0;
     for (int atom = blockIdx.x*blockDim.x + threadIdx.x; atom < NUM_ATOMS; atom += blockDim.x*gridDim.x) {
-        real scale = polarizability[atom];
+        //
+        real3 fld = make_real3(fixedField[atom+0*PADDED_NUM_ATOMS] + inducedField[atom+0*PADDED_NUM_ATOMS],
+                               fixedField[atom+1*PADDED_NUM_ATOMS] + inducedField[atom+1*PADDED_NUM_ATOMS],
+                               fixedField[atom+2*PADDED_NUM_ATOMS] + inducedField[atom+2*PADDED_NUM_ATOMS]);
+        int offset = 6*atom;
         for (int component = 0; component < 3; component++) {
             int dipoleIndex = 3*atom+component;
-            int fieldIndex = atom+component*PADDED_NUM_ATOMS;
             if (iteration >= MAX_PREV_DIIS_DIPOLES) {
                 // We have filled up the buffer for previous dipoles, so shift them all over by one.
-                
                 for (int i = 1; i < MAX_PREV_DIIS_DIPOLES; i++) {
                     int index1 = dipoleIndex+(i-1)*NUM_ATOMS*3;
                     int index2 = dipoleIndex+i*NUM_ATOMS*3;
                     prevDipoles[index1] = prevDipoles[index2];
-                    prevDipolesPolar[index1] = prevDipolesPolar[index2];
                     if (recordPrevErrors)
                         prevErrors[index1] = prevErrors[index2];
                 }
             }
-            
             // Compute the new dipole, and record it along with the error.
-            
+            real3 alpha;
+            if(component==0)
+                alpha = make_real3(labFramePolarizabilities[offset+0], labFramePolarizabilities[offset+1], labFramePolarizabilities[offset+2]);
+            else if(component==1)
+                alpha = make_real3(labFramePolarizabilities[offset+1], labFramePolarizabilities[offset+3], labFramePolarizabilities[offset+4]);
+            else if(component==2)
+                alpha = make_real3(labFramePolarizabilities[offset+2], labFramePolarizabilities[offset+4], labFramePolarizabilities[offset+5]);
+
             real oldDipole = inducedDipole[dipoleIndex];
-            real oldDipolePolar = inducedDipolePolar[dipoleIndex];
-            long long fixedS = (fixedFieldS == NULL ? (long long) 0 : fixedFieldS[fieldIndex]);
-            real newDipole = scale*((fixedField[fieldIndex]+fixedS+inducedField[fieldIndex])*fieldScale);
-            real newDipolePolar = scale*((fixedFieldPolar[fieldIndex]+fixedS+inducedFieldPolar[fieldIndex])*fieldScale);
+            real newDipole = fieldScale*dot(alpha, fld);
             int storePrevIndex = dipoleIndex+min(iteration, MAX_PREV_DIIS_DIPOLES-1)*NUM_ATOMS*3;
             prevDipoles[storePrevIndex] = newDipole;
-            prevDipolesPolar[storePrevIndex] = newDipolePolar;
             if (recordPrevErrors)
                 prevErrors[storePrevIndex] = newDipole-oldDipole;
             sumErrors += (newDipole-oldDipole)*(newDipole-oldDipole);
-            sumPolarErrors += (newDipolePolar-oldDipolePolar)*(newDipolePolar-oldDipolePolar);
         }
     }
-    
+
     // Sum the errors over threads and store the total for this block.
-    
-    buffer[threadIdx.x] = make_real2(sumErrors, sumPolarErrors);
+
+    buffer[threadIdx.x] = sumErrors;
     __syncthreads();
     for (int offset = 1; offset < blockDim.x; offset *= 2) {
         if (threadIdx.x+offset < blockDim.x && (threadIdx.x&(2*offset-1)) == 0) {
-            buffer[threadIdx.x].x += buffer[threadIdx.x+offset].x;
-            buffer[threadIdx.x].y += buffer[threadIdx.x+offset].y;
+            buffer[threadIdx.x] += buffer[threadIdx.x+offset];
         }
         __syncthreads();
     }
     if (threadIdx.x == 0)
-        errors[blockIdx.x] = make_float2((float) buffer[0].x, (float) buffer[0].y);
-    
+        errors[blockIdx.x] = buffer[0];
+
     if (iteration >= MAX_PREV_DIIS_DIPOLES && recordPrevErrors && blockIdx.x == 0) {
         // Shift over the existing matrix elements.
-        
         for (int i = 0; i < MAX_PREV_DIIS_DIPOLES-1; i++) {
             if (threadIdx.x < MAX_PREV_DIIS_DIPOLES-1)
                 matrix[threadIdx.x+i*MAX_PREV_DIIS_DIPOLES] = matrix[(threadIdx.x+1)+(i+1)*MAX_PREV_DIIS_DIPOLES];
@@ -674,99 +585,107 @@ extern "C" __global__ void solveDIISMatrix(int iteration, const real* __restrict
     }
 }
 
-extern "C" __global__ void updateInducedFieldByDIIS(real* __restrict__ inducedDipole, real* __restrict__ inducedDipolePolar, 
-        const real* __restrict__ prevDipoles, const real* __restrict__ prevDipolesPolar, const float* __restrict__ coefficients, int numPrev) {
+extern "C" __global__ void updateInducedFieldByDIIS(real* __restrict__ inducedDipole, const real* __restrict__ prevDipoles, 
+                                                    const float* __restrict__ coefficients, int numPrev) {
     for (int index = blockIdx.x*blockDim.x + threadIdx.x; index < 3*NUM_ATOMS; index += blockDim.x*gridDim.x) {
         real sum = 0;
-        real sumPolar = 0;
         for (int i = 0; i < numPrev; i++) {
             sum += coefficients[i]*prevDipoles[i*3*NUM_ATOMS+index];
-            sumPolar += coefficients[i]*prevDipolesPolar[i*3*NUM_ATOMS+index];
         }
         inducedDipole[index] = sum;
-        inducedDipolePolar[index] = sumPolar;
     }
 }
 
-extern "C" __global__ void initExtrapolatedDipoles(real* __restrict__ inducedDipole, real* __restrict__ inducedDipolePolar, real* __restrict__ extrapolatedDipole,
-        real* __restrict__ extrapolatedDipolePolar, long long* __restrict__ inducedDipoleFieldGradient, long long* __restrict__ inducedDipoleFieldGradientPolar
-        ) {
+extern "C" __global__ void initExtrapolatedDipoles(real* __restrict__ inducedDipole, real* __restrict__ extrapolatedDipole,
+        long long* __restrict__ inducedDipoleFieldGradient) {
     for (int index = blockIdx.x*blockDim.x+threadIdx.x; index < 3*NUM_ATOMS; index += blockDim.x*gridDim.x) {
         extrapolatedDipole[index] = inducedDipole[index];
-        extrapolatedDipolePolar[index] = inducedDipolePolar[index];
     }
     for (int index = blockIdx.x*blockDim.x+threadIdx.x; index < 6*NUM_ATOMS; index += blockDim.x*gridDim.x) {
         inducedDipoleFieldGradient[index] = 0;
-        inducedDipoleFieldGradientPolar[index] = 0;
     }
 }
 
-extern "C" __global__ void iterateExtrapolatedDipoles(int order, real* __restrict__ inducedDipole, real* __restrict__ inducedDipolePolar, real* __restrict__ extrapolatedDipole,
-        real* __restrict__ extrapolatedDipolePolar, long long* __restrict__ inducedDipoleFieldGradient, long long* __restrict__ inducedDipoleFieldGradientPolar,
-        long long* __restrict__ inducedDipoleField, long long* __restrict__ inducedDipoleFieldPolar, real* __restrict__ extrapolatedDipoleFieldGradient, real* __restrict__ extrapolatedDipoleFieldGradientPolar,
-        const float* __restrict__ polarizability) {
+extern "C" __global__ void iterateExtrapolatedDipoles(int order, real* __restrict__ inducedDipole, real* __restrict__ extrapolatedDipole,
+        long long* __restrict__ inducedDipoleFieldGradient, long long* __restrict__ inducedDipoleField,
+        real* __restrict__ extrapolatedDipoleField, real* __restrict__ extrapolatedDipoleFieldGradient, const real* __restrict__ labFramePolarizabilities) {
     const real fieldScale = 1/(real) 0x100000000;
+    for (int atom = blockIdx.x*blockDim.x + threadIdx.x; atom < NUM_ATOMS; atom += blockDim.x*gridDim.x) {
+        int offset = 6*atom;
+        real3 fld = make_real3(inducedDipoleField[atom+0*PADDED_NUM_ATOMS],
+                               inducedDipoleField[atom+1*PADDED_NUM_ATOMS],
+                               inducedDipoleField[atom+2*PADDED_NUM_ATOMS]);
+        for (int component = 0; component < 3; component++) {
+            // Compute the new dipole, and record it along with the error.
+            real3 alpha;
+            if(component==0)
+                alpha = make_real3(labFramePolarizabilities[offset+0], labFramePolarizabilities[offset+1], labFramePolarizabilities[offset+2]);
+            else if(component==1)
+                alpha = make_real3(labFramePolarizabilities[offset+1], labFramePolarizabilities[offset+3], labFramePolarizabilities[offset+4]);
+            else if(component==2)
+                alpha = make_real3(labFramePolarizabilities[offset+2], labFramePolarizabilities[offset+4], labFramePolarizabilities[offset+5]);
+            real value = dot(alpha,fld)*fieldScale;
+            inducedDipole[3*atom+component] = value;
+            extrapolatedDipole[order*3*NUM_ATOMS+3*atom+component] = value;
+        }
+
+    }
     for (int index = blockIdx.x*blockDim.x+threadIdx.x; index < 3*NUM_ATOMS; index += blockDim.x*gridDim.x) {
+        int index2 = (order-1)*3*NUM_ATOMS+index;
         int atom = index/3;
-        int component = index-3*atom;
-        int fieldIndex = atom+component*PADDED_NUM_ATOMS;
-        float polar = polarizability[atom];
-        real value = inducedDipoleField[fieldIndex]*fieldScale*polar;
-        inducedDipole[index] = value;
-        extrapolatedDipole[order*3*NUM_ATOMS+index] = value;
-        value = inducedDipoleFieldPolar[fieldIndex]*fieldScale*polar;
-        inducedDipolePolar[index] = value;
-        extrapolatedDipolePolar[order*3*NUM_ATOMS+index] = value;
+        int component = index%3;
+        extrapolatedDipoleField[index2] = fieldScale*inducedDipoleField[atom+component*PADDED_NUM_ATOMS];
     }
     for (int index = blockIdx.x*blockDim.x+threadIdx.x; index < 6*NUM_ATOMS; index += blockDim.x*gridDim.x) {
         int index2 = (order-1)*6*NUM_ATOMS+index;
         extrapolatedDipoleFieldGradient[index2] = fieldScale*inducedDipoleFieldGradient[index];
-        extrapolatedDipoleFieldGradientPolar[index2] = fieldScale*inducedDipoleFieldGradientPolar[index];
     }
 }
 
-extern "C" __global__ void computeExtrapolatedDipoles(real* __restrict__ inducedDipole, real* __restrict__ inducedDipolePolar, real* __restrict__ extrapolatedDipole,
-        real* __restrict__ extrapolatedDipolePolar
-        ) {
+extern "C" __global__ void computeExtrapolatedDipoles(real* __restrict__ inducedDipole, real* __restrict__ extrapolatedDipole) {
     real coeff[] = {EXTRAPOLATION_COEFFICIENTS_SUM};
     for (int index = blockIdx.x*blockDim.x+threadIdx.x; index < 3*NUM_ATOMS; index += blockDim.x*gridDim.x) {
-        real sum = 0, sumPolar = 0;
+        real sum = 0;
         for (int order = 0; order < MAX_EXTRAPOLATION_ORDER; order++) {
             sum += extrapolatedDipole[order*3*NUM_ATOMS+index]*coeff[order];
-            sumPolar += extrapolatedDipolePolar[order*3*NUM_ATOMS+index]*coeff[order];
         }
         inducedDipole[index] = sum;
-        inducedDipolePolar[index] = sumPolar;
     }
 }
 
-extern "C" __global__ void addExtrapolatedFieldGradientToForce(long long* __restrict__ forceBuffers, real* __restrict__ extrapolatedDipole,
-        real* __restrict__ extrapolatedDipolePolar, real* __restrict__ extrapolatedDipoleFieldGradient, real* __restrict__ extrapolatedDipoleFieldGradientPolar
-        ) {
+extern "C" __global__ void addExtrapolatedFieldGradientToForce(long long* __restrict__ forceBuffers,
+        long long* __restrict__ torqueBuffers,
+        const float2* __restrict__ dampingAndThole,
+        real* __restrict__ extrapolatedDipole,
+        real* __restrict__ extrapolatedDipoleField, real* __restrict__ extrapolatedDipoleFieldGradient ) {
     real coeff[] = {EXTRAPOLATION_COEFFICIENTS_SUM};
     for (int atom = blockIdx.x*blockDim.x+threadIdx.x; atom < NUM_ATOMS; atom += blockDim.x*gridDim.x) {
         real fx = 0, fy = 0, fz = 0;
+        real tx = 0, ty = 0, tz = 0;
+        bool isAnisotropic = dampingAndThole[atom].x < 0 ? false : true;
         for (int l = 0; l < MAX_EXTRAPOLATION_ORDER-1; l++) {
             int index1 = 3*(l*NUM_ATOMS+atom);
             real dipole[] = {extrapolatedDipole[index1], extrapolatedDipole[index1+1], extrapolatedDipole[index1+2]};
-            real dipolePolar[] = {extrapolatedDipolePolar[index1], extrapolatedDipolePolar[index1+1], extrapolatedDipolePolar[index1+2]};
             for (int m = 0; m < MAX_EXTRAPOLATION_ORDER-1-l; m++) {
                 int index2 = 6*(m*NUM_ATOMS+atom);
-                real scale = 0.5f*coeff[l+m+1]*ENERGY_SCALE_FACTOR;
-                real gradient[] = {extrapolatedDipoleFieldGradient[index2], extrapolatedDipoleFieldGradient[index2+1], extrapolatedDipoleFieldGradient[index2+2],
+                int index3 = 3*(m*NUM_ATOMS+atom);
+                real scale = coeff[l+m+1]*ENERGY_SCALE_FACTOR;
+                real fieldGradient[] = {extrapolatedDipoleFieldGradient[index2], extrapolatedDipoleFieldGradient[index2+1], extrapolatedDipoleFieldGradient[index2+2],
                                    extrapolatedDipoleFieldGradient[index2+3], extrapolatedDipoleFieldGradient[index2+4], extrapolatedDipoleFieldGradient[index2+5]};
-                real gradientPolar[] = {extrapolatedDipoleFieldGradientPolar[index2], extrapolatedDipoleFieldGradientPolar[index2+1], extrapolatedDipoleFieldGradientPolar[index2+2],
-                                        extrapolatedDipoleFieldGradientPolar[index2+3], extrapolatedDipoleFieldGradientPolar[index2+4], extrapolatedDipoleFieldGradientPolar[index2+5]};
-                fx += scale*(dipole[0]*gradientPolar[0] + dipole[1]*gradientPolar[3] + dipole[2]*gradientPolar[4]);
-                fy += scale*(dipole[0]*gradientPolar[3] + dipole[1]*gradientPolar[1] + dipole[2]*gradientPolar[5]);
-                fz += scale*(dipole[0]*gradientPolar[4] + dipole[1]*gradientPolar[5] + dipole[2]*gradientPolar[2]);
-                fx += scale*(dipolePolar[0]*gradient[0] + dipolePolar[1]*gradient[3] + dipolePolar[2]*gradient[4]);
-                fy += scale*(dipolePolar[0]*gradient[3] + dipolePolar[1]*gradient[1] + dipolePolar[2]*gradient[5]);
-                fz += scale*(dipolePolar[0]*gradient[4] + dipolePolar[1]*gradient[5] + dipolePolar[2]*gradient[2]);
+                real dipoleField[] = {extrapolatedDipoleField[index3], extrapolatedDipoleField[index3+1], extrapolatedDipoleField[index3+2]};
+                fx += scale*(dipole[0]*fieldGradient[0] + dipole[1]*fieldGradient[3] + dipole[2]*fieldGradient[4]);
+                fy += scale*(dipole[0]*fieldGradient[3] + dipole[1]*fieldGradient[1] + dipole[2]*fieldGradient[5]);
+                fz += scale*(dipole[0]*fieldGradient[4] + dipole[1]*fieldGradient[5] + dipole[2]*fieldGradient[2]);
+                tx += scale*(dipole[1]*dipoleField[2] - dipole[2]*dipoleField[1]);
+                ty += scale*(dipole[2]*dipoleField[0] - dipole[0]*dipoleField[2]);
+                tz += scale*(dipole[0]*dipoleField[1] - dipole[1]*dipoleField[0]);
             }
         }
         forceBuffers[atom] += (long long) (fx*0x100000000);
         forceBuffers[atom+PADDED_NUM_ATOMS] += (long long) (fy*0x100000000);
         forceBuffers[atom+PADDED_NUM_ATOMS*2] += (long long) (fz*0x100000000);
+        torqueBuffers[atom] += (long long) (isAnisotropic?tx*0x100000000:0);
+        torqueBuffers[atom+PADDED_NUM_ATOMS] += (long long) (isAnisotropic?ty*0x100000000:0);
+        torqueBuffers[atom+PADDED_NUM_ATOMS*2] += (long long) (isAnisotropic?tz*0x100000000:0);
     }
 }

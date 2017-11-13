@@ -1,16 +1,20 @@
 #define WARPS_PER_GROUP (THREAD_BLOCK_SIZE/TILE_SIZE)
 
 typedef struct {
-    real3 pos, force, torque, inducedDipole, inducedDipolePolar, sphericalDipole;
+    real3 pos, force, torque, inducedDipole, sphericalDipole;
     real q;
     float thole, damp;
 #ifdef INCLUDE_QUADRUPOLES
     real sphericalQuadrupole[5];
 #endif
+#ifdef INCLUDE_OCTOPOLES
+    real sphericalOctopole[7];
+#endif
 } AtomData;
 
 inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __restrict__ posq, const real* __restrict__ sphericalDipole,
-        const real* __restrict__ sphericalQuadrupole, const real* __restrict__ inducedDipole, const real* __restrict__ inducedDipolePolar, const float2* __restrict__ dampingAndThole) {
+        const real* __restrict__ sphericalQuadrupole, const real* __restrict__ sphericalOctopole, const real* __restrict__ inducedDipole,
+        const float2* __restrict__ dampingAndThole) {
     real4 atomPosq = posq[atom];
     data.pos = make_real3(atomPosq.x, atomPosq.y, atomPosq.z);
     data.q = atomPosq.w;
@@ -24,37 +28,38 @@ inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __res
     data.sphericalQuadrupole[3] = sphericalQuadrupole[atom*5+3];
     data.sphericalQuadrupole[4] = sphericalQuadrupole[atom*5+4];
 #endif
+#ifdef INCLUDE_OCTOPOLES
+    data.sphericalOctopole[0] = sphericalOctopole[atom*7];
+    data.sphericalOctopole[1] = sphericalOctopole[atom*7+1];
+    data.sphericalOctopole[2] = sphericalOctopole[atom*7+2];
+    data.sphericalOctopole[3] = sphericalOctopole[atom*7+3];
+    data.sphericalOctopole[4] = sphericalOctopole[atom*7+4];
+    data.sphericalOctopole[5] = sphericalOctopole[atom*7+5];
+    data.sphericalOctopole[6] = sphericalOctopole[atom*7+6];
+#endif
     data.inducedDipole.x = inducedDipole[atom*3];
     data.inducedDipole.y = inducedDipole[atom*3+1];
     data.inducedDipole.z = inducedDipole[atom*3+2];
-    data.inducedDipolePolar.x = inducedDipolePolar[atom*3];
-    data.inducedDipolePolar.y = inducedDipolePolar[atom*3+1];
-    data.inducedDipolePolar.z = inducedDipolePolar[atom*3+2];
     float2 temp = dampingAndThole[atom];
     data.damp = temp.x;
     data.thole = temp.y;
-}
-
-__device__ real computeDScaleFactor(unsigned int polarizationGroup, int index) {
-    return (polarizationGroup & 1<<index ? 0 : 1);
 }
 
 __device__ float computeMScaleFactor(uint2 covalent, int index) {
     int mask = 1<<index;
     bool x = (covalent.x & mask);
     bool y = (covalent.y & mask);
-    return (x ? (y ? 0.0f : 0.4f) : (y ? 0.8f : 1.0f));
+    return (x && y ? 0.0f : 1.0f);
 }
 
-__device__ float computePScaleFactor(uint2 covalent, unsigned int polarizationGroup, int index) {
+__device__ float computePScaleFactor(uint2 covalent, int index) {
     int mask = 1<<index;
     bool x = (covalent.x & mask);
     bool y = (covalent.y & mask);
-    bool p = (polarizationGroup & mask);
-    return (x && y ? 0.0f : (x && p ? 0.5f : 1.0f));
+    return (x && y ? 0.0f : 1.0f);
 }
 
-__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool hasExclusions, float dScale, float pScale, float mScale, float forceFactor, mixed& energy) {
+__device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool hasExclusions, float pScale, float mScale, float forceFactor, mixed& energy) {
     // Compute the displacement.
     
     real3 delta;
@@ -77,12 +82,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
     real3 qiUindJ = 0.5f*make_real3(qiRotationMatrix[0][1]*atom2.inducedDipole.x + qiRotationMatrix[0][2]*atom2.inducedDipole.y + qiRotationMatrix[0][0]*atom2.inducedDipole.z,
                                     qiRotationMatrix[1][1]*atom2.inducedDipole.x + qiRotationMatrix[1][2]*atom2.inducedDipole.y + qiRotationMatrix[1][0]*atom2.inducedDipole.z,
                                     qiRotationMatrix[2][1]*atom2.inducedDipole.x + qiRotationMatrix[2][2]*atom2.inducedDipole.y + qiRotationMatrix[2][0]*atom2.inducedDipole.z);
-    real3 qiUinpI = 0.5f*make_real3(qiRotationMatrix[0][1]*atom1.inducedDipolePolar.x + qiRotationMatrix[0][2]*atom1.inducedDipolePolar.y + qiRotationMatrix[0][0]*atom1.inducedDipolePolar.z,
-                                    qiRotationMatrix[1][1]*atom1.inducedDipolePolar.x + qiRotationMatrix[1][2]*atom1.inducedDipolePolar.y + qiRotationMatrix[1][0]*atom1.inducedDipolePolar.z,
-                                    qiRotationMatrix[2][1]*atom1.inducedDipolePolar.x + qiRotationMatrix[2][2]*atom1.inducedDipolePolar.y + qiRotationMatrix[2][0]*atom1.inducedDipolePolar.z);
-    real3 qiUinpJ = 0.5f*make_real3(qiRotationMatrix[0][1]*atom2.inducedDipolePolar.x + qiRotationMatrix[0][2]*atom2.inducedDipolePolar.y + qiRotationMatrix[0][0]*atom2.inducedDipolePolar.z,
-                                    qiRotationMatrix[1][1]*atom2.inducedDipolePolar.x + qiRotationMatrix[1][2]*atom2.inducedDipolePolar.y + qiRotationMatrix[1][0]*atom2.inducedDipolePolar.z,
-                                    qiRotationMatrix[2][1]*atom2.inducedDipolePolar.x + qiRotationMatrix[2][2]*atom2.inducedDipolePolar.y + qiRotationMatrix[2][0]*atom2.inducedDipolePolar.z);
     
     real3 rotatedDipole1 = rotateDipole(atom1.sphericalDipole, qiRotationMatrix);
     real3 rotatedDipole2 = rotateDipole(atom2.sphericalDipole, qiRotationMatrix);
@@ -91,46 +90,57 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
 #ifdef INCLUDE_QUADRUPOLES
     rotateQuadupoles(qiRotationMatrix, atom1.sphericalQuadrupole, atom2.sphericalQuadrupole, rotatedQuadrupole1, rotatedQuadrupole2);
 #endif    
-    
+    real rotatedOctopole1[] = {0, 0, 0, 0, 0, 0, 0};
+    real rotatedOctopole2[] = {0, 0, 0, 0, 0, 0, 0};
+#ifdef INCLUDE_OCTOPOLES
+    rotateOctopoles(qiRotationMatrix, atom1.sphericalOctopole, atom2.sphericalOctopole, rotatedOctopole1, rotatedOctopole2);
+#endif    
     // The field derivatives at I due to permanent and induced moments on J, and vice-versa.
     // Also, their derivatives w.r.t. R, which are needed for force calculations
-    real Vij[9], Vji[9], VjiR[9], VijR[9];
+    real Vij[16], Vji[16], VjiR[16], VijR[16];
     // The field derivatives at I due to only permanent moments on J, and vice-versa.
-    real Vijp[3], Vijd[3], Vjip[3], Vjid[3];
-    real rInvVec[7];
+    real Vijd[3], Vjid[3];
+    real rInvVec[9];
 
     // The rInvVec array is defined such that the ith element is R^-i, with the
     // dieleectric constant folded in, to avoid conversions later.
     rInvVec[1] = rInv;
-    for (int i = 2; i < 7; ++i)
+    for (int i = 2; i < 10; ++i)
         rInvVec[i] = rInvVec[i-1] * rInv;
 
-    real dmp = atom1.damp*atom2.damp;
-    real a = min(atom1.thole, atom2.thole);
-    real u = r/dmp;
-    real au3 = fabs(dmp) > 1.0e-5f ? a*u*u*u : 0;
-    real expau3 = fabs(dmp) > 1.0e-5f ? EXP(-au3) : 0;
-    real a2u6 = au3*au3;
-    real a3u9 = a2u6*au3;
+    real dmp = std::abs(atom1.damp*atom2.damp);
+    real a = pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
+    real u = dmp > (real)1.0E-5 ? r/dmp : (real)1E10;
+    real au = a*u;
+    real expau = au < (real)50 ? exp(-au) : (real)0;
+    real au2 = au*au;
+    real au3 = au2*au;
+    real au4 = au3*au;
+    real au5 = au4*au;
+    real au6 = au5*au;
     // Thole damping factors for energies
-    real thole_c  = 1 - expau3;
-    real thole_d0 = 1 - expau3*(1 + 1.5f*au3);
-    real thole_d1 = 1 - expau3;
-    real thole_q0 = 1 - expau3*(1 + au3 + a2u6);
-    real thole_q1 = 1 - expau3*(1 + au3);
+    real thole_c   = 1 - expau*(1 + au + au2/2);
+    real thole_d0  = 1 - expau*(1 + au + au2/2 + au3/4);
+    real thole_d1  = 1 - expau*(1 + au + au2/2);
+    real thole_q0  = 1 - expau*(1 + au + au2/2 + au3/6 + au4/18);
+    real thole_q1  = 1 - expau*(1 + au + au2/2 + au3/6);
+    real thole_o0  = 1 - expau*(1 + au + au2/2 + au3/6 + au4/24 + au5/120);
+    real thole_o1  = 1 - expau*(1 + au + au2/2 + au3/6 + au4/30);
     // Thole damping factors for derivatives
-    real dthole_c  = 1 - expau3*(1 + 1.5f*au3);
-    real dthole_d0 = 1 - expau3*(1 + au3 + 1.5f*a2u6);
-    real dthole_d1 = 1 - expau3*(1 + au3);
-    real dthole_q0 = 1 - expau3*(1 + au3 + 0.25f*a2u6 + 0.75f*a3u9);
-    real dthole_q1 = 1 - expau3*(1 + au3 + 0.75f*a2u6);
+    real dthole_c  = 1 - expau*(1 + au + au2/2 + au3/4);
+    real dthole_d0 = 1 - expau*(1 + au + au2/2 + au3/6 + au4/12);
+    real dthole_d1 = 1 - expau*(1 + au + au2/2 + au3/6);
+    real dthole_q0 = 1 - expau*(1 + au + au2/2 + au3/6 + au4/24 + au5/72);
+    real dthole_q1 = 1 - expau*(1 + au + au2/2 + au3/6 + au4/24);
+    real dthole_o0 = 1 - expau*(1 + au + au2/2 + au3/6 + au4/24 + au5/120 + au6/600);
+    real dthole_o1 = 1 - expau*(1 + au + au2/2 + au3/6 + au4/25 + au5/150);
 
     // Now we compute the (attenuated) Coulomb operator and its derivatives, contracted with
     // permanent moments and induced dipoles.  Note that the coefficient of the permanent force
     // terms is half of the expected value; this is because we compute the interaction of I with
     // the sum of induced and permanent moments on J, as well as the interaction of J with I's
     // permanent and induced moments; doing so double counts the permanent-permanent interaction.
-    real ePermCoef, dPermCoef, eUIndCoef, dUIndCoef, eUInpCoef, dUInpCoef;
+    real ePermCoef, dPermCoef, eUIndCoef, dUIndCoef;
 
     // C-C terms (m=0)
     ePermCoef = rInvVec[1]*mScale;
@@ -142,62 +152,48 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
 
     // C-D and C-Uind terms (m=0)
     ePermCoef = rInvVec[2]*mScale;
-    eUIndCoef = rInvVec[2]*pScale*thole_c;
-    eUInpCoef = rInvVec[2]*dScale*thole_c;
+    eUIndCoef = 2*rInvVec[2]*pScale*thole_c;
     dPermCoef = -rInvVec[3]*mScale;
-    dUIndCoef = -2*rInvVec[3]*pScale*dthole_c;
-    dUInpCoef = -2*rInvVec[3]*dScale*dthole_c;
-    Vij[0]  += -(ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x + eUInpCoef*qiUinpJ.x);
+    dUIndCoef = -4*rInvVec[3]*pScale*dthole_c;
+    Vij[0]  += -(ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x);
     Vji[1]   = -(ePermCoef*atom1.q);
-    VijR[0] += -(dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x + dUInpCoef*qiUinpJ.x);
+    VijR[0] += -(dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x);
     VjiR[1]  = -(dPermCoef*atom1.q);
-    Vjip[0]  = -(eUInpCoef*atom1.q);
     Vjid[0]  = -(eUIndCoef*atom1.q);
     // D-C and Uind-C terms (m=0)
     Vij[1]   = ePermCoef*atom2.q;
-    Vji[0]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x + eUInpCoef*qiUinpI.x;
+    Vji[0]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x;
     VijR[1]  = dPermCoef*atom2.q;
-    VjiR[0] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x + dUInpCoef*qiUinpI.x;
-    Vijp[0]  = eUInpCoef*atom2.q;
+    VjiR[0] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x;
     Vijd[0]  = eUIndCoef*atom2.q;
 
     // D-D and D-Uind terms (m=0)
     ePermCoef = -2*rInvVec[3]*mScale;
-    eUIndCoef = -2*rInvVec[3]*pScale*thole_d0;
-    eUInpCoef = -2*rInvVec[3]*dScale*thole_d0;
+    eUIndCoef = -4*rInvVec[3]*pScale*thole_d0;
     dPermCoef = 3*rInvVec[4]*mScale;
-    dUIndCoef = 6*rInvVec[4]*pScale*dthole_d0;
-    dUInpCoef = 6*rInvVec[4]*dScale*dthole_d0;
-    Vij[1]  += ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x + eUInpCoef*qiUinpJ.x;
-    Vji[1]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x + eUInpCoef*qiUinpI.x;
-    VijR[1] += dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x + dUInpCoef*qiUinpJ.x;
-    VjiR[1] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x + dUInpCoef*qiUinpI.x;
-    Vijp[0] += eUInpCoef*rotatedDipole2.x;
+    dUIndCoef = 12*rInvVec[4]*pScale*dthole_d0;
+    Vij[1]  += ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x;
+    Vji[1]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x;
+    VijR[1] += dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x;
+    VjiR[1] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x;
     Vijd[0] += eUIndCoef*rotatedDipole2.x;
-    Vjip[0] += eUInpCoef*rotatedDipole1.x;
     Vjid[0] += eUIndCoef*rotatedDipole1.x;
     // D-D and D-Uind terms (m=1)
     ePermCoef = rInvVec[3]*mScale;
-    eUIndCoef = rInvVec[3]*pScale*thole_d1;
-    eUInpCoef = rInvVec[3]*dScale*thole_d1;
+    eUIndCoef = 2*rInvVec[3]*pScale*thole_d1;
     dPermCoef = -1.5f*rInvVec[4]*mScale;
-    dUIndCoef = -3*rInvVec[4]*pScale*dthole_d1;
-    dUInpCoef = -3*rInvVec[4]*dScale*dthole_d1;
-    Vij[2]  = ePermCoef*rotatedDipole2.y + eUIndCoef*qiUindJ.y + eUInpCoef*qiUinpJ.y;
-    Vji[2]  = ePermCoef*rotatedDipole1.y + eUIndCoef*qiUindI.y + eUInpCoef*qiUinpI.y;
-    VijR[2] = dPermCoef*rotatedDipole2.y + dUIndCoef*qiUindJ.y + dUInpCoef*qiUinpJ.y;
-    VjiR[2] = dPermCoef*rotatedDipole1.y + dUIndCoef*qiUindI.y + dUInpCoef*qiUinpI.y;
-    Vij[3]  = ePermCoef*rotatedDipole2.z + eUIndCoef*qiUindJ.z + eUInpCoef*qiUinpJ.z;
-    Vji[3]  = ePermCoef*rotatedDipole1.z + eUIndCoef*qiUindI.z + eUInpCoef*qiUinpI.z;
-    VijR[3] = dPermCoef*rotatedDipole2.z + dUIndCoef*qiUindJ.z + dUInpCoef*qiUinpJ.z;
-    VjiR[3] = dPermCoef*rotatedDipole1.z + dUIndCoef*qiUindI.z + dUInpCoef*qiUinpI.z;
-    Vijp[1] = eUInpCoef*rotatedDipole2.y;
+    dUIndCoef = -6*rInvVec[4]*pScale*dthole_d1;
+    Vij[2]  = ePermCoef*rotatedDipole2.y + eUIndCoef*qiUindJ.y;
+    Vji[2]  = ePermCoef*rotatedDipole1.y + eUIndCoef*qiUindI.y;
+    VijR[2] = dPermCoef*rotatedDipole2.y + dUIndCoef*qiUindJ.y;
+    VjiR[2] = dPermCoef*rotatedDipole1.y + dUIndCoef*qiUindI.y;
+    Vij[3]  = ePermCoef*rotatedDipole2.z + eUIndCoef*qiUindJ.z;
+    Vji[3]  = ePermCoef*rotatedDipole1.z + eUIndCoef*qiUindI.z;
+    VijR[3] = dPermCoef*rotatedDipole2.z + dUIndCoef*qiUindJ.z;
+    VjiR[3] = dPermCoef*rotatedDipole1.z + dUIndCoef*qiUindI.z;
     Vijd[1] = eUIndCoef*rotatedDipole2.y;
-    Vjip[1] = eUInpCoef*rotatedDipole1.y;
     Vjid[1] = eUIndCoef*rotatedDipole1.y;
-    Vijp[2] = eUInpCoef*rotatedDipole2.z;
     Vijd[2] = eUIndCoef*rotatedDipole2.z;
-    Vjip[2] = eUInpCoef*rotatedDipole1.z;
     Vjid[2] = eUIndCoef*rotatedDipole1.z;
 
     // C-Q terms (m=0)
@@ -214,58 +210,48 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
     VjiR[0] += dPermCoef*rotatedQuadrupole1[0];
 
     // D-Q and Uind-Q terms (m=0)
-    ePermCoef = rInvVec[4]*3.0*mScale;
-    eUIndCoef = rInvVec[4]*3.0*pScale*thole_q0;
-    eUInpCoef = rInvVec[4]*3.0*dScale*thole_q0;
+    ePermCoef = 3*rInvVec[4]*mScale;
+    eUIndCoef = 6*rInvVec[4]*pScale*thole_q0;
     dPermCoef = -6*rInvVec[5]*mScale;
-    dUIndCoef = -12*rInvVec[5]*pScale*dthole_q0;
-    dUInpCoef = -12*rInvVec[5]*dScale*dthole_q0;
+    dUIndCoef = -24*rInvVec[5]*pScale*dthole_q0;
     Vij[1]  += ePermCoef*rotatedQuadrupole2[0];
-    Vji[4]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x + eUInpCoef*qiUinpI.x;
+    Vji[4]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x;
     VijR[1] += dPermCoef*rotatedQuadrupole2[0];
-    VjiR[4] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x + dUInpCoef*qiUinpI.x;
-    Vijp[0] += eUInpCoef*rotatedQuadrupole2[0];
+    VjiR[4] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x;
     Vijd[0] += eUIndCoef*rotatedQuadrupole2[0];
     // Q-D and Q-Uind terms (m=0)
-    Vij[4]  += -(ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x + eUInpCoef*qiUinpJ.x);
+    Vij[4]  += -(ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x);
     Vji[1]  += -(ePermCoef*rotatedQuadrupole1[0]);
-    VijR[4] += -(dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x + dUInpCoef*qiUinpJ.x);
+    VijR[4] += -(dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x);
     VjiR[1] += -(dPermCoef*rotatedQuadrupole1[0]);
-    Vjip[0] += -(eUInpCoef*rotatedQuadrupole1[0]);
     Vjid[0] += -(eUIndCoef*rotatedQuadrupole1[0]);
 
     // D-Q and Uind-Q terms (m=1)
     const real sqrtThree = SQRT((real) 3);
     ePermCoef = -sqrtThree*rInvVec[4]*mScale;
-    eUIndCoef = -sqrtThree*rInvVec[4]*pScale*thole_q1;
-    eUInpCoef = -sqrtThree*rInvVec[4]*dScale*thole_q1;
+    eUIndCoef = -2*sqrtThree*rInvVec[4]*pScale*thole_q1;
     dPermCoef = 2*sqrtThree*rInvVec[5]*mScale;
-    dUIndCoef = 4*sqrtThree*rInvVec[5]*pScale*dthole_q1;
-    dUInpCoef = 4*sqrtThree*rInvVec[5]*dScale*dthole_q1;
+    dUIndCoef = 8*sqrtThree*rInvVec[5]*pScale*dthole_q1;
     Vij[2]  += ePermCoef*rotatedQuadrupole2[1];
-    Vji[5]   = ePermCoef*rotatedDipole1.y + eUIndCoef*qiUindI.y + eUInpCoef*qiUinpI.y;
+    Vji[5]   = ePermCoef*rotatedDipole1.y + eUIndCoef*qiUindI.y;
     VijR[2] += dPermCoef*rotatedQuadrupole2[1];
-    VjiR[5]  = dPermCoef*rotatedDipole1.y + dUIndCoef*qiUindI.y + dUInpCoef*qiUinpI.y;
+    VjiR[5]  = dPermCoef*rotatedDipole1.y + dUIndCoef*qiUindI.y;
     Vij[3]  += ePermCoef*rotatedQuadrupole2[2];
-    Vji[6]   = ePermCoef*rotatedDipole1.z + eUIndCoef*qiUindI.z + eUInpCoef*qiUinpI.z;
+    Vji[6]   = ePermCoef*rotatedDipole1.z + eUIndCoef*qiUindI.z;
     VijR[3] += dPermCoef*rotatedQuadrupole2[2];
-    VjiR[6]  = dPermCoef*rotatedDipole1.z + dUIndCoef*qiUindI.z + dUInpCoef*qiUinpI.z;
-    Vijp[1] += eUInpCoef*rotatedQuadrupole2[1];
+    VjiR[6]  = dPermCoef*rotatedDipole1.z + dUIndCoef*qiUindI.z;
     Vijd[1] += eUIndCoef*rotatedQuadrupole2[1];
-    Vijp[2] += eUInpCoef*rotatedQuadrupole2[2];
     Vijd[2] += eUIndCoef*rotatedQuadrupole2[2];
     // D-Q and Uind-Q terms (m=1)
-    Vij[5]   = -(ePermCoef*rotatedDipole2.y + eUIndCoef*qiUindJ.y + eUInpCoef*qiUinpJ.y);
+    Vij[5]   = -(ePermCoef*rotatedDipole2.y + eUIndCoef*qiUindJ.y);
     Vji[2]  += -(ePermCoef*rotatedQuadrupole1[1]);
-    VijR[5]  = -(dPermCoef*rotatedDipole2.y + dUIndCoef*qiUindJ.y + dUInpCoef*qiUinpJ.y);
+    VijR[5]  = -(dPermCoef*rotatedDipole2.y + dUIndCoef*qiUindJ.y);
     VjiR[2] += -(dPermCoef*rotatedQuadrupole1[1]);
-    Vij[6]   = -(ePermCoef*rotatedDipole2.z + eUIndCoef*qiUindJ.z + eUInpCoef*qiUinpJ.z);
+    Vij[6]   = -(ePermCoef*rotatedDipole2.z + eUIndCoef*qiUindJ.z);
     Vji[3]  += -(ePermCoef*rotatedQuadrupole1[2]);
-    VijR[6]  = -(dPermCoef*rotatedDipole2.z + dUIndCoef*qiUindJ.z + dUInpCoef*qiUinpJ.z);
+    VijR[6]  = -(dPermCoef*rotatedDipole2.z + dUIndCoef*qiUindJ.z);
     VjiR[3] += -(dPermCoef*rotatedQuadrupole1[2]);
-    Vjip[1] += -(eUInpCoef*rotatedQuadrupole1[1]);
     Vjid[1] += -(eUIndCoef*rotatedQuadrupole1[1]);
-    Vjip[2] += -(eUInpCoef*rotatedQuadrupole1[2]);
     Vjid[2] += -(eUIndCoef*rotatedQuadrupole1[2]);
 
     // Q-Q terms (m=0)
@@ -298,19 +284,282 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
     VijR[8] = dPermCoef*rotatedQuadrupole2[4];
     VjiR[8] = dPermCoef*rotatedQuadrupole1[4];
 
+
+    // C-O (m=0)
+    ePermCoef = -rInvVec[4]*mScale;
+    dPermCoef = 2*rInvVec[5]*mScale;
+    Vij[0]  += ePermCoef*rotatedOctopole2[0];
+    Vji[9]   = ePermCoef*atom1.q;
+    VijR[0] += dPermCoef*rotatedOctopole2[0];
+    VjiR[9]  = dPermCoef*atom1.q;
+    // O-C (m=0)
+    Vij[9]   = -ePermCoef*atom2.q;
+    Vji[0]  -=  ePermCoef*rotatedOctopole1[0];
+    VijR[9]  = -dPermCoef*atom2.q;
+    VjiR[0] -=  dPermCoef*rotatedOctopole1[0];
+
+    // D-O and Uind-O (m=0)
+    ePermCoef = -4*rInvVec[5]*mScale;
+    eUIndCoef = -8*rInvVec[5]*pScale*thole_o0;
+    dPermCoef = 10*rInvVec[6]*mScale;
+    dUIndCoef = 40*rInvVec[6]*pScale*dthole_o0;
+    Vij[1]  += ePermCoef*rotatedOctopole2[0];
+    Vji[9]  += ePermCoef*rotatedDipole1.x + eUIndCoef*qiUindI.x;
+    VijR[1] += dPermCoef*rotatedOctopole2[0];
+    VjiR[9] += dPermCoef*rotatedDipole1.x + dUIndCoef*qiUindI.x;
+    // O-D and O-Uind (m=0)
+    Vij[9]  += ePermCoef*rotatedDipole2.x + eUIndCoef*qiUindJ.x;
+    Vji[1]  += ePermCoef*rotatedOctopole1[0];
+    VijR[9] += dPermCoef*rotatedDipole2.x + dUIndCoef*qiUindJ.x;
+    VjiR[1] += dPermCoef*rotatedOctopole1[0];
+    Vijd[0] += eUIndCoef*rotatedOctopole2[0];
+    Vjid[0] += eUIndCoef*rotatedOctopole1[0];
+    // D-O and O-Uind (m=1)
+    const real sqrtSix = SQRT((real) 6);
+    ePermCoef = sqrtSix*rInvVec[5]*mScale;
+    eUIndCoef = 2*sqrtSix*rInvVec[5]*pScale*thole_o1;
+    dPermCoef = -2.5f*sqrtSix*rInvVec[6]*mScale;
+    dUIndCoef = -10*sqrtSix*rInvVec[6]*pScale*dthole_o1;
+    Vij[2]   += ePermCoef*rotatedOctopole2[1];
+    Vji[10]   = ePermCoef*rotatedDipole1.y + eUIndCoef*qiUindI.y;
+    VijR[2]  += dPermCoef*rotatedOctopole2[1];
+    VjiR[10]  = dPermCoef*rotatedDipole1.y + dUIndCoef*qiUindI.y;
+    Vij[3]   += ePermCoef*rotatedOctopole2[2];
+    Vji[11]   = ePermCoef*rotatedDipole1.z + eUIndCoef*qiUindI.z;
+    VijR[3]  += dPermCoef*rotatedOctopole2[2];
+    VjiR[11]  = dPermCoef*rotatedDipole1.z + dUIndCoef*qiUindI.z;
+    Vijd[1] += eUIndCoef*rotatedOctopole2[1];
+    Vijd[2] += eUIndCoef*rotatedOctopole2[2];
+    // O-D and O-Uind (m=1)
+    Vij[10]   = ePermCoef*rotatedDipole2.y + eUIndCoef*qiUindJ.y;
+    Vji[2]   += ePermCoef*rotatedOctopole1[1];
+    VijR[10]  = dPermCoef*rotatedDipole2.y + dUIndCoef*qiUindJ.y;
+    VjiR[2]  += dPermCoef*rotatedOctopole1[1];
+    Vij[11]   = ePermCoef*rotatedDipole2.z + eUIndCoef*qiUindJ.z;
+    Vji[3]   += ePermCoef*rotatedOctopole1[2];
+    VijR[11]  = dPermCoef*rotatedDipole2.z + dUIndCoef*qiUindJ.z;
+    VjiR[3]  += dPermCoef*rotatedOctopole1[2];
+    Vjid[1] += eUIndCoef*rotatedOctopole1[1];
+    Vjid[2] += eUIndCoef*rotatedOctopole1[2];
+
+    // Q-O (m=0)
+    ePermCoef = -10*rInvVec[6]*mScale;
+    dPermCoef = 30*rInvVec[7]*mScale;
+    Vij[4]  += ePermCoef*rotatedOctopole2[0];
+    Vji[9]  += ePermCoef*rotatedQuadrupole1[0];
+    VijR[4] += dPermCoef*rotatedOctopole2[0];
+    VjiR[9] += dPermCoef*rotatedQuadrupole1[0];
+    // O-Q (m=0)
+    Vij[9]  -= ePermCoef*rotatedQuadrupole2[0];
+    Vji[4]  -= ePermCoef*rotatedOctopole1[0];
+    VijR[9] -= dPermCoef*rotatedQuadrupole2[0];
+    VjiR[4] -= dPermCoef*rotatedOctopole1[0];
+    // Q-O (m=1)
+    const real sqrtTwo = SQRT((real)2);
+    ePermCoef = 5*sqrtTwo*rInvVec[6]*mScale;
+    dPermCoef = -15*sqrtTwo*rInvVec[7]*mScale;
+    Vij[5]   += ePermCoef*rotatedOctopole2[1];
+    Vji[10]  += ePermCoef*rotatedQuadrupole1[1];
+    VijR[5]  += dPermCoef*rotatedOctopole2[1];
+    VjiR[10] += dPermCoef*rotatedQuadrupole1[1];
+    Vij[6]   += ePermCoef*rotatedOctopole2[2];
+    Vji[11]  += ePermCoef*rotatedQuadrupole1[2];
+    VijR[6]  += dPermCoef*rotatedOctopole2[2];
+    VjiR[11] += dPermCoef*rotatedQuadrupole1[2];
+    // O-Q (m=1)
+    Vij[10]  -= ePermCoef*rotatedQuadrupole2[1];
+    Vji[5]   -= ePermCoef*rotatedOctopole1[1];
+    VijR[10] -= dPermCoef*rotatedQuadrupole2[1];
+    VjiR[5]  -= dPermCoef*rotatedOctopole1[1];
+    Vij[11]  -= ePermCoef*rotatedQuadrupole2[2];
+    Vji[6]   -= ePermCoef*rotatedOctopole1[2];
+    VijR[11] -= dPermCoef*rotatedQuadrupole2[2];
+    VjiR[6]  -= dPermCoef*rotatedOctopole1[2];
+    // Q-O (m=2)
+    const real sqrtFive = SQRT((real) 5);
+    ePermCoef = -sqrtFive*rInvVec[6]*mScale;
+    dPermCoef = 3*sqrtFive*rInvVec[7]*mScale;
+    Vij[7]  += ePermCoef*rotatedOctopole2[3];
+    Vji[12]  = ePermCoef*rotatedQuadrupole1[3];
+    VijR[7] += dPermCoef*rotatedOctopole2[3];
+    VjiR[12] = dPermCoef*rotatedQuadrupole1[3];
+    Vij[8]  += ePermCoef*rotatedOctopole2[4];
+    Vji[13]  = ePermCoef*rotatedQuadrupole1[4];
+    VijR[8] += dPermCoef*rotatedOctopole2[4];
+    VjiR[13] = dPermCoef*rotatedQuadrupole1[4];
+    // O-Q (m=2)
+    Vij[12]  = -ePermCoef*rotatedQuadrupole2[3];
+    Vji[7]  -=  ePermCoef*rotatedOctopole1[3];
+    VijR[12] = -dPermCoef*rotatedQuadrupole2[3];
+    VjiR[7] -=  dPermCoef*rotatedOctopole1[3];
+    Vij[13]  = -ePermCoef*rotatedQuadrupole2[4];
+    Vji[8]  -=  ePermCoef*rotatedOctopole1[4];
+    VijR[13] = -dPermCoef*rotatedQuadrupole2[4];
+    VjiR[8] -=  dPermCoef*rotatedOctopole1[4];
+
+    // O-O (m=0)
+    ePermCoef = -20*rInvVec[7]*mScale;
+    dPermCoef = 70*rInvVec[8]*mScale;
+    Vij[9]  += ePermCoef*rotatedOctopole2[0];
+    Vji[9]  += ePermCoef*rotatedOctopole1[0];
+    VijR[9] += dPermCoef*rotatedOctopole2[0];
+    VjiR[9] += dPermCoef*rotatedOctopole1[0];
+    // O-O (m=1)
+    ePermCoef = 15*rInvVec[7]*mScale;
+    dPermCoef = -52*rInvVec[8]*mScale;
+    Vij[10]  += ePermCoef*rotatedOctopole2[1];
+    Vji[10]  += ePermCoef*rotatedOctopole1[1];
+    VijR[10] += dPermCoef*rotatedOctopole2[1];
+    VjiR[10] += dPermCoef*rotatedOctopole1[1];
+    Vij[11]  += ePermCoef*rotatedOctopole2[2];
+    Vji[11]  += ePermCoef*rotatedOctopole1[2];
+    VijR[11] += dPermCoef*rotatedOctopole2[2];
+    VjiR[11] += dPermCoef*rotatedOctopole1[2];
+    // O-O (m=2)
+    ePermCoef = -6*rInvVec[7]*mScale;
+    dPermCoef = 21*rInvVec[8]*mScale;
+    Vij[12]  += ePermCoef*rotatedOctopole2[3];
+    Vji[12]  += ePermCoef*rotatedOctopole1[3];
+    VijR[12] += dPermCoef*rotatedOctopole2[3];
+    VjiR[12] += dPermCoef*rotatedOctopole1[3];
+    Vij[13]  += ePermCoef*rotatedOctopole2[4];
+    Vji[13]  += ePermCoef*rotatedOctopole1[4];
+    VijR[13] += dPermCoef*rotatedOctopole2[4];
+    VjiR[13] += dPermCoef*rotatedOctopole1[4];
+    // O-O (m=3)
+    ePermCoef = rInvVec[7]*mScale;
+    dPermCoef = -3*rInvVec[8]*mScale;
+    Vij[14]  = ePermCoef*rotatedOctopole2[5];
+    Vji[14]  = ePermCoef*rotatedOctopole1[5];
+    VijR[14] = dPermCoef*rotatedOctopole2[5];
+    VjiR[14] = dPermCoef*rotatedOctopole1[5];
+    Vij[15]  = ePermCoef*rotatedOctopole2[6];
+    Vji[15]  = ePermCoef*rotatedOctopole1[6];
+    VijR[15] = dPermCoef*rotatedOctopole2[6];
+    VjiR[15] = dPermCoef*rotatedOctopole1[6];
+
+
     // Evaluate the energies, forces and torques due to permanent+induced moments
     // interacting with just the permanent moments.
     energy += forceFactor*0.5f*(
-        atom1.q*Vij[0] + rotatedDipole1.x*Vij[1] + rotatedDipole1.y*Vij[2] + rotatedDipole1.z*Vij[3] + rotatedQuadrupole1[0]*Vij[4] + rotatedQuadrupole1[1]*Vij[5] + rotatedQuadrupole1[2]*Vij[6] + rotatedQuadrupole1[3]*Vij[7] + rotatedQuadrupole1[4]*Vij[8] +
-        atom2.q*Vji[0] + rotatedDipole2.x*Vji[1] + rotatedDipole2.y*Vji[2] + rotatedDipole2.z*Vji[3] + rotatedQuadrupole2[0]*Vji[4] + rotatedQuadrupole2[1]*Vji[5] + rotatedQuadrupole2[2]*Vji[6] + rotatedQuadrupole2[3]*Vji[7] + rotatedQuadrupole2[4]*Vji[8]);
-    real fIZ = atom1.q*VijR[0] + rotatedDipole1.x*VijR[1] + rotatedDipole1.y*VijR[2] + rotatedDipole1.z*VijR[3] + rotatedQuadrupole1[0]*VijR[4] + rotatedQuadrupole1[1]*VijR[5] + rotatedQuadrupole1[2]*VijR[6] + rotatedQuadrupole1[3]*VijR[7] + rotatedQuadrupole1[4]*VijR[8];
-    real fJZ = atom2.q*VjiR[0] + rotatedDipole2.x*VjiR[1] + rotatedDipole2.y*VjiR[2] + rotatedDipole2.z*VjiR[3] + rotatedQuadrupole2[0]*VjiR[4] + rotatedQuadrupole2[1]*VjiR[5] + rotatedQuadrupole2[2]*VjiR[6] + rotatedQuadrupole2[3]*VjiR[7] + rotatedQuadrupole2[4]*VjiR[8];
-    real EIX = rotatedDipole1.z*Vij[1] - rotatedDipole1.x*Vij[3] + sqrtThree*rotatedQuadrupole1[2]*Vij[4] + rotatedQuadrupole1[4]*Vij[5] - (sqrtThree*rotatedQuadrupole1[0]+rotatedQuadrupole1[3])*Vij[6] + rotatedQuadrupole1[2]*Vij[7] - rotatedQuadrupole1[1]*Vij[8];
-    real EIY = -rotatedDipole1.y*Vij[1] + rotatedDipole1.x*Vij[2] - sqrtThree*rotatedQuadrupole1[1]*Vij[4] + (sqrtThree*rotatedQuadrupole1[0]-rotatedQuadrupole1[3])*Vij[5] - rotatedQuadrupole1[4]*Vij[6] + rotatedQuadrupole1[1]*Vij[7] + rotatedQuadrupole1[2]*Vij[8];
-    real EIZ = -rotatedDipole1.z*Vij[2] + rotatedDipole1.y*Vij[3] - rotatedQuadrupole1[2]*Vij[5] + rotatedQuadrupole1[1]*Vij[6] - 2*rotatedQuadrupole1[4]*Vij[7] + 2*rotatedQuadrupole1[3]*Vij[8];
-    real EJX = rotatedDipole2.z*Vji[1] - rotatedDipole2.x*Vji[3] + sqrtThree*rotatedQuadrupole2[2]*Vji[4] + rotatedQuadrupole2[4]*Vji[5] - (sqrtThree*rotatedQuadrupole2[0]+rotatedQuadrupole2[3])*Vji[6] + rotatedQuadrupole2[2]*Vji[7] - rotatedQuadrupole2[1]*Vji[8];
-    real EJY = -rotatedDipole2.y*Vji[1] + rotatedDipole2.x*Vji[2] - sqrtThree*rotatedQuadrupole2[1]*Vji[4] + (sqrtThree*rotatedQuadrupole2[0]-rotatedQuadrupole2[3])*Vji[5] - rotatedQuadrupole2[4]*Vji[6] + rotatedQuadrupole2[1]*Vji[7] + rotatedQuadrupole2[2]*Vji[8];
-    real EJZ = -rotatedDipole2.z*Vji[2] + rotatedDipole2.y*Vji[3] - rotatedQuadrupole2[2]*Vji[5] + rotatedQuadrupole2[1]*Vji[6] - 2*rotatedQuadrupole2[4]*Vji[7] + 2*rotatedQuadrupole2[3]*Vji[8];
+        atom1.q*Vij[0]
+              + rotatedDipole1.x*Vij[1] + rotatedDipole1.y*Vij[2] + rotatedDipole1.z*Vij[3]
+              + rotatedQuadrupole1[0]*Vij[4] + rotatedQuadrupole1[1]*Vij[5] + rotatedQuadrupole1[2]*Vij[6] + rotatedQuadrupole1[3]*Vij[7] + rotatedQuadrupole1[4]*Vij[8]
+              + rotatedOctopole1[0]*Vij[9] + rotatedOctopole1[1]*Vij[10] + rotatedOctopole1[2]*Vij[11] + rotatedOctopole1[3]*Vij[12]
+              + rotatedOctopole1[4]*Vij[13] + rotatedOctopole1[5]*Vij[14] + rotatedOctopole1[6]*Vij[15]
+      + atom2.q*Vji[0]
+              + rotatedDipole2.x*Vji[1] + rotatedDipole2.y*Vji[2] + rotatedDipole2.z*Vji[3]
+              + rotatedQuadrupole2[0]*Vji[4] + rotatedQuadrupole2[1]*Vji[5] + rotatedQuadrupole2[2]*Vji[6] + rotatedQuadrupole2[3]*Vji[7] + rotatedQuadrupole2[4]*Vji[8]
+              + rotatedOctopole2[0]*Vji[9] + rotatedOctopole2[1]*Vji[10] + rotatedOctopole2[2]*Vji[11] + rotatedOctopole2[3]*Vji[12]
+              + rotatedOctopole2[4]*Vji[13] + rotatedOctopole2[5]*Vji[14] + rotatedOctopole2[6]*Vji[15]
+    );
+    real fIZ = atom1.q*VijR[0]
+             + rotatedDipole1.x*VijR[1] + rotatedDipole1.y*VijR[2] + rotatedDipole1.z*VijR[3]
+             + rotatedQuadrupole1[0]*VijR[4] + rotatedQuadrupole1[1]*VijR[5] + rotatedQuadrupole1[2]*VijR[6] + rotatedQuadrupole1[3]*VijR[7] + rotatedQuadrupole1[4]*VijR[8]
+             + rotatedOctopole1[0]*VijR[9] + rotatedOctopole1[1]*VijR[10] + rotatedOctopole1[2]*VijR[11] + rotatedOctopole1[3]*VijR[12]
+             + rotatedOctopole1[4]*VijR[13] + rotatedOctopole1[5]*VijR[14] + rotatedOctopole1[6]*VijR[15]
+             ;
+    real fJZ = atom2.q*VjiR[0]
+             + rotatedDipole2.x*VjiR[1] + rotatedDipole2.y*VjiR[2] + rotatedDipole2.z*VjiR[3]
+             + rotatedQuadrupole2[0]*VjiR[4] + rotatedQuadrupole2[1]*VjiR[5] + rotatedQuadrupole2[2]*VjiR[6] + rotatedQuadrupole2[3]*VjiR[7] + rotatedQuadrupole2[4]*VjiR[8]
+             + rotatedOctopole2[0]*VjiR[9] + rotatedOctopole2[1]*VjiR[10] + rotatedOctopole2[2]*VjiR[11] + rotatedOctopole2[3]*VjiR[12]
+             + rotatedOctopole2[4]*VjiR[13] + rotatedOctopole2[5]*VjiR[14] + rotatedOctopole2[6]*VjiR[15]
+             ;
+
+    const real sqrtThreeHalves = SQRT((real)1.5f);
+    const real sqrtFiveHalves = SQRT((real)2.5f);
+    real EIX = 0 
+             + rotatedDipole1.z*Vij[1]
+             - rotatedDipole1.x*Vij[3]
+             + sqrtThree*rotatedQuadrupole1[2]*Vij[4]
+             + rotatedQuadrupole1[4]*Vij[5]
+             - (sqrtThree*rotatedQuadrupole1[0]+rotatedQuadrupole1[3])*Vij[6]
+             + rotatedQuadrupole1[2]*Vij[7]
+             - rotatedQuadrupole1[1]*Vij[8]
+             + sqrtSix*rotatedOctopole1[2]*Vij[9]
+             + sqrtFiveHalves*rotatedOctopole1[4]*Vij[10]
+             - (sqrtSix*rotatedOctopole1[0]+sqrtFiveHalves*rotatedOctopole1[3])*Vij[11]
+             + (sqrtFiveHalves*rotatedOctopole1[2]+sqrtThreeHalves*rotatedOctopole1[6])*Vij[12]
+             - (sqrtFiveHalves*rotatedOctopole1[1]+sqrtThreeHalves*rotatedOctopole1[5])*Vij[13]
+             + sqrtThreeHalves*rotatedOctopole1[4]*Vij[14]
+             - sqrtThreeHalves*rotatedOctopole1[3]*Vij[15]
+             ;
+    real EIY = 0
+             - rotatedDipole1.y*Vij[1]
+             + rotatedDipole1.x*Vij[2]
+             - sqrtThree*rotatedQuadrupole1[1]*Vij[4]
+             + (sqrtThree*rotatedQuadrupole1[0]-rotatedQuadrupole1[3])*Vij[5]
+             - rotatedQuadrupole1[4]*Vij[6] 
+             + rotatedQuadrupole1[1]*Vij[7] 
+             + rotatedQuadrupole1[2]*Vij[8]
+             - sqrtSix*rotatedOctopole1[1]*Vij[9]
+             + (sqrtSix*rotatedOctopole1[0]-sqrtFiveHalves*rotatedOctopole1[3])*Vij[10]
+             - sqrtFiveHalves*rotatedOctopole1[4]*Vij[11]
+             + (sqrtFiveHalves*rotatedOctopole1[1]-sqrtThreeHalves*rotatedOctopole1[5])*Vij[12]
+             + (sqrtFiveHalves*rotatedOctopole1[2]-sqrtThreeHalves*rotatedOctopole1[6])*Vij[13]
+             + sqrtThreeHalves*rotatedOctopole1[3]*Vij[14]
+             + sqrtThreeHalves*rotatedOctopole1[4]*Vij[15]
+             ;
+    real EIZ = 0
+             - rotatedDipole1.z*Vij[2]
+             + rotatedDipole1.y*Vij[3] 
+             - rotatedQuadrupole1[2]*Vij[5] 
+             + rotatedQuadrupole1[1]*Vij[6] 
+             - 2*rotatedQuadrupole1[4]*Vij[7] 
+             + 2*rotatedQuadrupole1[3]*Vij[8]
+             - rotatedOctopole1[2]*Vij[10]
+             + rotatedOctopole1[1]*Vij[11]
+             - 2*rotatedOctopole1[4]*Vij[12]
+             + 2*rotatedOctopole1[3]*Vij[13]
+             - 3*rotatedOctopole1[6]*Vij[14]
+             + 3*rotatedOctopole1[5]*Vij[15]
+             ;
+    real EJX = 0
+             + rotatedDipole2.z*Vji[1]
+             - rotatedDipole2.x*Vji[3]
+             + sqrtThree*rotatedQuadrupole2[2]*Vji[4]
+             + rotatedQuadrupole2[4]*Vji[5]
+             - (sqrtThree*rotatedQuadrupole2[0]+rotatedQuadrupole2[3])*Vji[6]
+             + rotatedQuadrupole2[2]*Vji[7]
+             - rotatedQuadrupole2[1]*Vji[8]
+             + sqrtSix*rotatedOctopole2[2]*Vji[9]
+             + sqrtFiveHalves*rotatedOctopole2[4]*Vji[10]
+             - (sqrtSix*rotatedOctopole2[0]+sqrtFiveHalves*rotatedOctopole2[3])*Vji[11]
+             + (sqrtFiveHalves*rotatedOctopole2[2]+sqrtThreeHalves*rotatedOctopole2[6])*Vji[12]
+             - (sqrtFiveHalves*rotatedOctopole2[1]+sqrtThreeHalves*rotatedOctopole2[5])*Vji[13]
+             + sqrtThreeHalves*rotatedOctopole2[4]*Vji[14]
+             - sqrtThreeHalves*rotatedOctopole2[3]*Vji[15]
+             ;
+    real EJY = 0
+             - rotatedDipole2.y*Vji[1]
+             + rotatedDipole2.x*Vji[2]
+             - sqrtThree*rotatedQuadrupole2[1]*Vji[4]
+             + (sqrtThree*rotatedQuadrupole2[0]-rotatedQuadrupole2[3])*Vji[5]
+             - rotatedQuadrupole2[4]*Vji[6]
+             + rotatedQuadrupole2[1]*Vji[7]
+             + rotatedQuadrupole2[2]*Vji[8]
+             - sqrtSix*rotatedOctopole2[1]*Vji[9]
+             + (sqrtSix*rotatedOctopole2[0]-sqrtFiveHalves*rotatedOctopole2[3])*Vji[10]
+             - sqrtFiveHalves*rotatedOctopole2[4]*Vji[11]
+             + (sqrtFiveHalves*rotatedOctopole2[1]-sqrtThreeHalves*rotatedOctopole2[5])*Vji[12]
+             + (sqrtFiveHalves*rotatedOctopole2[2]-sqrtThreeHalves*rotatedOctopole2[6])*Vji[13]
+             + sqrtThreeHalves*rotatedOctopole2[3]*Vji[14]
+             + sqrtThreeHalves*rotatedOctopole2[4]*Vji[15]
+             ;
+    real EJZ = 0
+             - rotatedDipole2.z*Vji[2]
+             + rotatedDipole2.y*Vji[3]
+             - rotatedQuadrupole2[2]*Vji[5]
+             + rotatedQuadrupole2[1]*Vji[6]
+             - 2*rotatedQuadrupole2[4]*Vji[7]
+             + 2*rotatedQuadrupole2[3]*Vji[8]
+             - rotatedOctopole2[2]*Vji[10]
+             + rotatedOctopole2[1]*Vji[11]
+             - 2*rotatedOctopole2[4]*Vji[12]
+             + 2*rotatedOctopole2[3]*Vji[13]
+             - 3*rotatedOctopole2[6]*Vji[14]
+             + 3*rotatedOctopole2[5]*Vji[15]
+             ;
 
     // Define the torque intermediates for the induced dipoles. These are simply the induced dipole torque
     // intermediates dotted with the field due to permanent moments only, at each center. We inline the
@@ -320,32 +569,37 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
     //
     // The torque about the x axis (needed to obtain the y force on the induced dipoles, below)
     //    qiUindIx[0] = qiQUindI[2];    qiUindIx[1] = 0;    qiUindIx[2] = -qiQUindI[0]
-    real iEIX = qiUinpI.z*Vijp[0] + qiUindI.z*Vijd[0] - qiUinpI.x*Vijp[2] - qiUindI.x*Vijd[2];
-    real iEJX = qiUinpJ.z*Vjip[0] + qiUindJ.z*Vjid[0] - qiUinpJ.x*Vjip[2] - qiUindJ.x*Vjid[2];
+    real iEIX = qiUindI.z*Vijd[0] - qiUindI.x*Vijd[2];
+    real iEJX = qiUindJ.z*Vjid[0] - qiUindJ.x*Vjid[2];
     // The torque about the y axis (needed to obtain the x force on the induced dipoles, below)
     //    qiUindIy[0] = -qiQUindI[1];   qiUindIy[1] = qiQUindI[0];    qiUindIy[2] = 0
-    real iEIY = qiUinpI.x*Vijp[1] + qiUindI.x*Vijd[1] - qiUinpI.y*Vijp[0] - qiUindI.y*Vijd[0];
-    real iEJY = qiUinpJ.x*Vjip[1] + qiUindJ.x*Vjid[1] - qiUinpJ.y*Vjip[0] - qiUindJ.y*Vjid[0];
-
+    real iEIY = qiUindI.x*Vijd[1] - qiUindI.y*Vijd[0];
+    real iEJY = qiUindJ.x*Vjid[1] - qiUindJ.y*Vjid[0];
+    // The torque about the z axis (needed to obtain the x force on the induced dipoles, below)
+    //    qiUindIz[0] = 0;  qiUindIz[1] = -qiQUindI[2];    qiUindIz[2] = qiQUindI[1]
+    real iEIZ = qiUindI.y*Vijd[2] - qiUindI.z*Vijd[1];
+    real iEJZ = qiUindJ.y*Vjid[2] - qiUindJ.z*Vjid[1];
 #ifdef MUTUAL_POLARIZATION
     // Uind-Uind terms (m=0)
-    real eCoef = -4*rInvVec[3]*thole_d0;
-    real dCoef = 6*rInvVec[4]*dthole_d0;
-    iEIX += eCoef*(qiUinpI.z*qiUindJ.x + qiUindI.z*qiUinpJ.x);
-    iEJX += eCoef*(qiUinpJ.z*qiUindI.x + qiUindJ.z*qiUinpI.x);
-    iEIY -= eCoef*(qiUinpI.y*qiUindJ.x + qiUindI.y*qiUinpJ.x);
-    iEJY -= eCoef*(qiUinpJ.y*qiUindI.x + qiUindJ.y*qiUinpI.x);
-    fIZ += dCoef*(qiUinpI.x*qiUindJ.x + qiUindI.x*qiUinpJ.x);
-    fJZ += dCoef*(qiUinpJ.x*qiUindI.x + qiUindJ.x*qiUinpI.x);
+    real eCoef = -8*rInvVec[3]*thole_d0;
+    real dCoef = 12*rInvVec[4]*dthole_d0;
+    iEIX += eCoef*qiUindI.z*qiUindJ.x;
+    iEJX += eCoef*qiUindJ.z*qiUindI.x;
+    iEIY -= eCoef*qiUindI.y*qiUindJ.x;
+    iEJY -= eCoef*qiUindJ.y*qiUindI.x;
+    fIZ  += dCoef*qiUindI.x*qiUindJ.x;
+    fJZ  += dCoef*qiUindJ.x*qiUindI.x;
     // Uind-Uind terms (m=1)
-    eCoef = 2*rInvVec[3]*thole_d1;
-    dCoef = -3*rInvVec[4]*dthole_d1;
-    iEIX -= eCoef*(qiUinpI.x*qiUindJ.z + qiUindI.x*qiUinpJ.z);
-    iEJX -= eCoef*(qiUinpJ.x*qiUindI.z + qiUindJ.x*qiUinpI.z);
-    iEIY += eCoef*(qiUinpI.x*qiUindJ.y + qiUindI.x*qiUinpJ.y);
-    iEJY += eCoef*(qiUinpJ.x*qiUindI.y + qiUindJ.x*qiUinpI.y);
-    fIZ += dCoef*(qiUinpI.y*qiUindJ.y + qiUindI.y*qiUinpJ.y + qiUinpI.z*qiUindJ.z + qiUindI.z*qiUinpJ.z);
-    fJZ += dCoef*(qiUinpJ.y*qiUindI.y + qiUindJ.y*qiUinpI.y + qiUinpJ.z*qiUindI.z + qiUindJ.z*qiUinpI.z);
+    eCoef = 4*rInvVec[3]*thole_d1;
+    dCoef = -6*rInvVec[4]*dthole_d1;
+    iEIX -= eCoef*qiUindI.x*qiUindJ.z;
+    iEJX -= eCoef*qiUindJ.x*qiUindI.z;
+    iEIY += eCoef*qiUindI.x*qiUindJ.y;
+    iEJY += eCoef*qiUindJ.x*qiUindI.y;
+    iEIZ += eCoef*qiUindI.y*qiUindJ.z;
+    iEJZ += eCoef*qiUindJ.y*qiUindI.z;
+    fIZ  += dCoef*(qiUindI.y*qiUindJ.y + qiUindI.z*qiUindJ.z);
+    fJZ  += dCoef*(qiUindJ.y*qiUindI.y + qiUindJ.z*qiUindI.z);
 #endif
 
     // The quasi-internal frame forces and torques.  Note that the induced torque intermediates are
@@ -354,6 +608,16 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
     real qiTorqueI[3] = {-EIX, -EIY, -EIZ};
     real qiTorqueJ[3] = {-EJX, -EJY, -EJZ};
 
+    if(atom1.damp > 0){
+        qiTorqueI[0] += -iEIX;
+        qiTorqueI[1] += -iEIY;
+        qiTorqueI[2] += -iEIZ;
+    }
+    if(atom2.damp > 0){
+        qiTorqueJ[0] += -iEJX;
+        qiTorqueJ[1] += -iEJY;
+        qiTorqueJ[2] += -iEJZ;
+    }
 
     real3 force = make_real3(qiRotationMatrix[1][1]*qiForce[0] + qiRotationMatrix[2][1]*qiForce[1] + qiRotationMatrix[0][1]*qiForce[2],
                              qiRotationMatrix[1][2]*qiForce[0] + qiRotationMatrix[2][2]*qiForce[1] + qiRotationMatrix[0][2]*qiForce[2],
@@ -375,15 +639,15 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
  */
 extern "C" __global__ void computeElectrostatics(
         unsigned long long* __restrict__ forceBuffers, unsigned long long* __restrict__ torqueBuffers, mixed* __restrict__ energyBuffer,
-        const real4* __restrict__ posq, const uint2* __restrict__ covalentFlags, const unsigned int* __restrict__ polarizationGroupFlags,
+        const real4* __restrict__ posq, const uint2* __restrict__ covalentFlags,
         const ushort2* __restrict__ exclusionTiles, unsigned int startTileIndex, unsigned int numTileIndices,
 #ifdef USE_CUTOFF
         const int* __restrict__ tiles, const unsigned int* __restrict__ interactionCount, real4 periodicBoxSize, real4 invPeriodicBoxSize,
         real4 periodicBoxVecX, real4 periodicBoxVecY, real4 periodicBoxVecZ, unsigned int maxTiles, const real4* __restrict__ blockCenter,
         const unsigned int* __restrict__ interactingAtoms,
 #endif
-        const real* __restrict__ sphericalDipole, const real* __restrict__ sphericalQuadrupole, const real* __restrict__ inducedDipole,
-        const real* __restrict__ inducedDipolePolar, const float2* __restrict__ dampingAndThole) {
+        const real* __restrict__ sphericalDipole, const real* __restrict__ sphericalQuadrupole,  const real* __restrict__ sphericalOctopole, const real* __restrict__ inducedDipole,
+        const float2* __restrict__ dampingAndThole) {
     const unsigned int totalWarps = (blockDim.x*gridDim.x)/TILE_SIZE;
     const unsigned int warp = (blockIdx.x*blockDim.x+threadIdx.x)/TILE_SIZE;
     const unsigned int tgx = threadIdx.x & (TILE_SIZE-1);
@@ -401,11 +665,10 @@ extern "C" __global__ void computeElectrostatics(
         const unsigned int y = tileIndices.y;
         AtomData data;
         unsigned int atom1 = x*TILE_SIZE + tgx;
-        loadAtomData(data, atom1, posq, sphericalDipole, sphericalQuadrupole, inducedDipole, inducedDipolePolar, dampingAndThole);
+        loadAtomData(data, atom1, posq, sphericalDipole, sphericalQuadrupole, sphericalOctopole, inducedDipole, dampingAndThole);
         data.force = make_real3(0);
         data.torque = make_real3(0);
         uint2 covalent = covalentFlags[pos*TILE_SIZE+tgx];
-        unsigned int polarizationGroup = polarizationGroupFlags[pos*TILE_SIZE+tgx];
         if (x == y) {
             // This tile is on the diagonal.
 
@@ -419,8 +682,16 @@ extern "C" __global__ void computeElectrostatics(
             localData[threadIdx.x].sphericalQuadrupole[3] = data.sphericalQuadrupole[3];
             localData[threadIdx.x].sphericalQuadrupole[4] = data.sphericalQuadrupole[4];
 #endif
+#ifdef INCLUDE_OCTOPOLES
+            localData[threadIdx.x].sphericalOctopole[0] = data.sphericalOctopole[0];
+            localData[threadIdx.x].sphericalOctopole[1] = data.sphericalOctopole[1];
+            localData[threadIdx.x].sphericalOctopole[2] = data.sphericalOctopole[2];
+            localData[threadIdx.x].sphericalOctopole[3] = data.sphericalOctopole[3];
+            localData[threadIdx.x].sphericalOctopole[4] = data.sphericalOctopole[4];
+            localData[threadIdx.x].sphericalOctopole[5] = data.sphericalOctopole[5];
+            localData[threadIdx.x].sphericalOctopole[6] = data.sphericalOctopole[6];
+#endif
             localData[threadIdx.x].inducedDipole = data.inducedDipole;
-            localData[threadIdx.x].inducedDipolePolar = data.inducedDipolePolar;
             localData[threadIdx.x].thole = data.thole;
             localData[threadIdx.x].damp = data.damp;
 
@@ -429,10 +700,9 @@ extern "C" __global__ void computeElectrostatics(
             for (unsigned int j = 0; j < TILE_SIZE; j++) {
                 int atom2 = y*TILE_SIZE+j;
                 if (atom1 != atom2 && atom1 < NUM_ATOMS && atom2 < NUM_ATOMS) {
-                    float d = computeDScaleFactor(polarizationGroup, j);
-                    float p = computePScaleFactor(covalent, polarizationGroup, j);
+                    float p = computePScaleFactor(covalent, j);
                     float m = computeMScaleFactor(covalent, j);
-                    computeOneInteraction(data, localData[tbx+j], true, d, p, m, 0.5f, energy);
+                    computeOneInteraction(data, localData[tbx+j], true, p, m, 0.5f, energy);
                 }
             }
             data.force *= -ENERGY_SCALE_FACTOR;
@@ -448,17 +718,16 @@ extern "C" __global__ void computeElectrostatics(
             // This is an off-diagonal tile.
 
             unsigned int j = y*TILE_SIZE + tgx;
-            loadAtomData(localData[threadIdx.x], j, posq, sphericalDipole, sphericalQuadrupole, inducedDipole, inducedDipolePolar, dampingAndThole);
+            loadAtomData(localData[threadIdx.x], j, posq, sphericalDipole, sphericalQuadrupole, sphericalOctopole, inducedDipole, dampingAndThole);
             localData[threadIdx.x].force = make_real3(0);
             localData[threadIdx.x].torque = make_real3(0);
             unsigned int tj = tgx;
             for (j = 0; j < TILE_SIZE; j++) {
                 int atom2 = y*TILE_SIZE+tj;
                 if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS) {
-                    float d = computeDScaleFactor(polarizationGroup, tj);
-                    float p = computePScaleFactor(covalent, polarizationGroup, tj);
+                    float p = computePScaleFactor(covalent, tj);
                     float m = computeMScaleFactor(covalent, tj);
-                    computeOneInteraction(data, localData[tbx+tj], true, d, p, m, 1, energy);
+                    computeOneInteraction(data, localData[tbx+tj], true, p, m, 1, energy);
                 }
                 tj = (tj + 1) & (TILE_SIZE - 1);
             }
@@ -541,7 +810,7 @@ extern "C" __global__ void computeElectrostatics(
             // Load atom data for this tile.
 
             AtomData data;
-            loadAtomData(data, atom1, posq, sphericalDipole, sphericalQuadrupole, inducedDipole, inducedDipolePolar, dampingAndThole);
+            loadAtomData(data, atom1, posq, sphericalDipole, sphericalQuadrupole, sphericalOctopole, inducedDipole, dampingAndThole);
             data.force = make_real3(0);
             data.torque = make_real3(0);
 #ifdef USE_CUTOFF
@@ -550,7 +819,7 @@ extern "C" __global__ void computeElectrostatics(
             unsigned int j = y*TILE_SIZE + tgx;
 #endif
             atomIndices[threadIdx.x] = j;
-            loadAtomData(localData[threadIdx.x], j, posq, sphericalDipole, sphericalQuadrupole, inducedDipole, inducedDipolePolar, dampingAndThole);
+            loadAtomData(localData[threadIdx.x], j, posq, sphericalDipole, sphericalQuadrupole, sphericalOctopole, inducedDipole, dampingAndThole);
             localData[threadIdx.x].force = make_real3(0);
             localData[threadIdx.x].torque = make_real3(0);
 
@@ -560,7 +829,7 @@ extern "C" __global__ void computeElectrostatics(
             for (j = 0; j < TILE_SIZE; j++) {
                 int atom2 = atomIndices[tbx+tj];
                 if (atom1 < NUM_ATOMS && atom2 < NUM_ATOMS) {
-                    computeOneInteraction(data, localData[tbx+tj], false, 1, 1, 1, 1, energy);
+                    computeOneInteraction(data, localData[tbx+tj], false, 1, 1, 1, energy);
                 }
                 tj = (tj + 1) & (TILE_SIZE - 1);
             }

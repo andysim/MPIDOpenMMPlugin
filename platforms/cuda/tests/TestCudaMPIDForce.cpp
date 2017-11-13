@@ -1189,7 +1189,7 @@ void testMethanolDimerEnergyAndForcesNoCutMutual() {
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
-    check_finite_differences(forces, context, positions);
+    //check_finite_differences(forces, context, positions);
 //    check_full_finite_differences(forces, context, positions, 1E-7, 5E-4);
 }
 
@@ -1307,7 +1307,6 @@ void testWaterDimerEnergyAndForcesNoCutDirect() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
     double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
-    const double alpha = 0.0000001;
     const int grid = 64;
     MPIDForce* forceField = new MPIDForce();
 
@@ -1614,18 +1613,18 @@ int main(int argc, char* argv[]) {
         if (argc > 1)
             Platform::getPlatformByName("CUDA").setPropertyDefaultValue("Precision", std::string(argv[1]));
 
-        testWaterDimerEnergyAndForcesNoCutDirect();
         //testWaterDimerEnergyAndForcesPMEDirect();
+        testWaterDimerEnergyAndForcesNoCutDirect();
         //testWaterDimerEnergyAndForcesPMEMutual();
-        //testWaterDimerEnergyAndForcesNoCutMutual();
+        testWaterDimerEnergyAndForcesNoCutMutual();
         //testWaterDimerEnergyAndForcesPMEExtrapolated();
-        //testWaterDimerEnergyAndForcesNoCutExtrapolated();
+        testWaterDimerEnergyAndForcesNoCutExtrapolated();
         //testMethanolDimerEnergyAndForcesPMEExtrapolated();
-        //testMethanolDimerEnergyAndForcesNoCutExtrapolated();
+        testMethanolDimerEnergyAndForcesNoCutExtrapolated();
         //testMethanolDimerEnergyAndForcesPMEDirect();
-        //testMethanolDimerEnergyAndForcesNoCutDirect();
+        testMethanolDimerEnergyAndForcesNoCutDirect();
         //testMethanolDimerEnergyAndForcesPMEMutual();
-        //testMethanolDimerEnergyAndForcesNoCutMutual();
+        testMethanolDimerEnergyAndForcesNoCutMutual();
     } catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;
         std::cout << "FAIL - ERROR.  Test failed." << std::endl;
