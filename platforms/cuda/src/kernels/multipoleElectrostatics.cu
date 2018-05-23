@@ -61,7 +61,6 @@ __device__ float computePScaleFactor(uint2 covalent, int index) {
 
 __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool hasExclusions, float pScale, float mScale, float forceFactor, mixed& energy) {
     // Compute the displacement.
-    
     real3 delta;
     delta.x = atom2.pos.x - atom1.pos.x;
     delta.y = atom2.pos.y - atom1.pos.y;
@@ -75,14 +74,13 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
     real qiRotationMatrix[3][3];
     buildQIRotationMatrix(delta, rInv, qiRotationMatrix);
 
-    
     real3 qiUindI = 0.5f*make_real3(qiRotationMatrix[0][1]*atom1.inducedDipole.x + qiRotationMatrix[0][2]*atom1.inducedDipole.y + qiRotationMatrix[0][0]*atom1.inducedDipole.z,
                                     qiRotationMatrix[1][1]*atom1.inducedDipole.x + qiRotationMatrix[1][2]*atom1.inducedDipole.y + qiRotationMatrix[1][0]*atom1.inducedDipole.z,
                                     qiRotationMatrix[2][1]*atom1.inducedDipole.x + qiRotationMatrix[2][2]*atom1.inducedDipole.y + qiRotationMatrix[2][0]*atom1.inducedDipole.z);
     real3 qiUindJ = 0.5f*make_real3(qiRotationMatrix[0][1]*atom2.inducedDipole.x + qiRotationMatrix[0][2]*atom2.inducedDipole.y + qiRotationMatrix[0][0]*atom2.inducedDipole.z,
                                     qiRotationMatrix[1][1]*atom2.inducedDipole.x + qiRotationMatrix[1][2]*atom2.inducedDipole.y + qiRotationMatrix[1][0]*atom2.inducedDipole.z,
                                     qiRotationMatrix[2][1]*atom2.inducedDipole.x + qiRotationMatrix[2][2]*atom2.inducedDipole.y + qiRotationMatrix[2][0]*atom2.inducedDipole.z);
-    
+
     real3 rotatedDipole1 = rotateDipole(atom1.sphericalDipole, qiRotationMatrix);
     real3 rotatedDipole2 = rotateDipole(atom2.sphericalDipole, qiRotationMatrix);
     real rotatedQuadrupole1[] = {0, 0, 0, 0, 0};

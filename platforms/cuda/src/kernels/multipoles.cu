@@ -4,7 +4,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
         float* __restrict__ polarizability, real* __restrict__ labFramePolarizabilities) {
     for (int atom = blockIdx.x*blockDim.x+threadIdx.x; atom < NUM_ATOMS; atom += gridDim.x*blockDim.x) {
         // Load the spherical multipoles.
-        
+
         int offset = 3*atom;
         sphericalDipoles[offset+0] = molecularDipoles[offset+2]; // z -> Q_10
         sphericalDipoles[offset+1] = molecularDipoles[offset+0]; // x -> Q_11c
@@ -31,13 +31,12 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
         // this atom is referred to as the k-atom in notes below
 
         // code common to ZThenX and Bisector
-        
         int4 particles = multipoleParticles[atom];
         if (particles.z >= 0) {
             real4 thisParticlePos = posq[atom];
             real4 posZ = posq[particles.z];
             real3 vectorZ = normalize(make_real3(posZ.x-thisParticlePos.x, posZ.y-thisParticlePos.y, posZ.z-thisParticlePos.z));
-            int axisType = particles.w; 
+            int axisType = particles.w;
             real4 posX;
             real3 vectorX;
             if (axisType >= 4) {
@@ -50,62 +49,57 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 posX = posq[particles.x];
                 vectorX = make_real3(posX.x-thisParticlePos.x, posX.y-thisParticlePos.y, posX.z-thisParticlePos.z);
             }
-    
+
             /*
                 z-only
                    (1) norm z
                    (2) select random x
                    (3) x = x - (x.z)z
                    (4) norm x
-        
+
                 z-then-x
                    (1) norm z
                    (2) norm x (not needed)
                    (3) x = x - (x.z)z
                    (4) norm x
-        
+
                 bisector
                    (1) norm z
-                   (2) norm x 
+                   (2) norm x
                    (3) z = x + z
                    (4) norm z
-                   (5) x = x - (x.z)z 
-                   (6) norm x 
-        
+                   (5) x = x - (x.z)z
+                   (6) norm x
+
                 z-bisect
                    (1) norm z
-                   (2) norm x 
-                   (3) norm y 
+                   (2) norm x
+                   (3) norm y
                    (3) x = x + y
                    (4) norm x
-                   (5) x = x - (x.z)z 
-                   (6) norm x 
-        
+                   (5) x = x - (x.z)z
+                   (6) norm x
+
                 3-fold
                    (1) norm z
-                   (2) norm x 
-                   (3) norm y 
+                   (2) norm x
+                   (3) norm y
                    (4) z = x + y + z
                    (5) norm z
-                   (6) x = x - (x.z)z 
-                   (7) norm x 
-        
+                   (6) x = x - (x.z)z
+                   (7) norm x
             */
-        
+
             // branch based on axis type
-                    
+
             if (axisType == 1) {
-        
                 // bisector
-                
                 vectorX = normalize(vectorX);
                 vectorZ += vectorX;
                 vectorZ = normalize(vectorZ);
             }
-            else if (axisType == 2 || axisType == 3) { 
-         
+            else if (axisType == 2 || axisType == 3) {
                 // z-bisect
-        
                 if (particles.y >= 0 && particles.y < NUM_ATOMS) {
                     real4 posY = posq[particles.y];
                     real3 vectorY = make_real3(posY.x-thisParticlePos.x, posY.y-thisParticlePos.y, posY.z-thisParticlePos.z);
@@ -115,42 +109,33 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                         vectorX += vectorY;
                         vectorX = normalize(vectorX);
                     }
-                    else { 
-             
+                    else {
                         // 3-fold
-                
                         vectorZ += vectorX + vectorY;
                         vectorZ = normalize(vectorZ);
                     }
                 }
-         
             }
-            
             // x = x - (x.z)z
-        
             vectorX -= dot(vectorZ, vectorX)*vectorZ;
             vectorX = normalize(vectorX);
             real3 vectorY = cross(vectorZ, vectorX);
-         
             // use identity rotation matrix for unrecognized axis types
-        
             if (axisType < 0 || axisType > 4) {
-        
                 vectorX.x = 1;
                 vectorX.y = 0;
                 vectorX.z = 0;
-        
+
                 vectorY.x = 0;
                 vectorY.y = 1;
                 vectorY.z = 0;
-        
+
                 vectorZ.x = 0;
                 vectorZ.y = 0;
                 vectorZ.z = 1;
             }
-            
             // Check the chirality and see whether it needs to be reversed
-            
+
             bool reverse = false;
             if (axisType == 0 && particles.x >= 0 && particles.y >=0 && particles.z >= 0) {
                 real4 posY = posq[particles.y];
@@ -175,9 +160,9 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 real volume = delta[3][0]*delta[0][0] + delta[3][1]*delta[1][0] + delta[3][2]*delta[2][0];
                 reverse = (volume < 0);
             }
-        
+
             // Transform the dipole
-            
+
             offset = 3*atom;
             real molDipole[3];
             molDipole[0] = molecularDipoles[offset];
@@ -188,11 +173,11 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             labFrameDipoles[offset] = molDipole[0]*vectorX.x + molDipole[1]*vectorY.x + molDipole[2]*vectorZ.x;
             labFrameDipoles[offset+1] = molDipole[0]*vectorX.y + molDipole[1]*vectorY.y + molDipole[2]*vectorZ.y;
             labFrameDipoles[offset+2] = molDipole[0]*vectorX.z + molDipole[1]*vectorY.z + molDipole[2]*vectorZ.z;
-            
+
             // ---------------------------------------------------------------------------------------
-            
+
             // Transform the quadrupole
-            
+
             offset = 5*atom;
             real mPoleXX = molecularQuadrupoles[offset];
             real mPoleXY = molecularQuadrupoles[offset+1];
@@ -200,12 +185,12 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             real mPoleYY = molecularQuadrupoles[offset+3];
             real mPoleYZ = molecularQuadrupoles[offset+4];
             real mPoleZZ = -(mPoleXX+mPoleYY);
-        
+
             if (reverse) {
                 mPoleXY *= -1;
                 mPoleYZ *= -1;
             }
-            
+
             labFrameQuadrupoles[offset] = vectorX.x*(vectorX.x*mPoleXX + vectorY.x*mPoleXY + vectorZ.x*mPoleXZ)
                                         + vectorY.x*(vectorX.x*mPoleXY + vectorY.x*mPoleYY + vectorZ.x*mPoleYZ)
                                         + vectorZ.x*(vectorX.x*mPoleXZ + vectorY.x*mPoleYZ + vectorZ.x*mPoleZZ);
@@ -250,7 +235,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             real mPoleYZZ = -molecularOctopoles[offset+1]-molecularOctopoles[offset+5];
             real mPoleZZZ = -molecularOctopoles[offset+2]-molecularOctopoles[offset+6];
 
-            real T2XXX = vectorX.x*(vectorX.x*mPoleXXX + vectorY.x*mPoleXXY + vectorZ.x*mPoleXXZ) 
+            real T2XXX = vectorX.x*(vectorX.x*mPoleXXX + vectorY.x*mPoleXXY + vectorZ.x*mPoleXXZ)
                        + vectorY.x*(vectorX.x*mPoleXXY + vectorY.x*mPoleXYY + vectorZ.x*mPoleXYZ)
                        + vectorZ.x*(vectorX.x*mPoleXXZ + vectorY.x*mPoleXYZ + vectorZ.x*mPoleXZZ);
             real T2XXY = vectorX.x*(vectorX.y*mPoleXXX + vectorY.y*mPoleXXY + vectorZ.y*mPoleXXZ)
@@ -303,9 +288,9 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             labFrameOctopoles[offset+4] = (vectorX.x*T2XYZ + vectorY.x*T2YYZ + vectorZ.x*T2ZYZ);
             labFrameOctopoles[offset+5] = (vectorX.y*T2XYY + vectorY.y*T2YYY + vectorZ.y*T2ZYY);
             labFrameOctopoles[offset+6] = (vectorX.y*T2XYZ + vectorY.y*T2YYZ + vectorZ.y*T2ZYZ);
-            
+
             // ---------------------------------------------------------------------------------------
-            
+
             // Now transform the spherical multipoles.  First do the dipoles.
 
             offset = 3*atom;
@@ -318,9 +303,9 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             sphericalDipoles[offset] = sphericalDipole[0]*vectorZ.z + sphericalDipole[1]*vectorX.z + sphericalDipole[2]*vectorY.z;
             sphericalDipoles[offset+1] = sphericalDipole[0]*vectorZ.x + sphericalDipole[1]*vectorX.x + sphericalDipole[2]*vectorY.x;
             sphericalDipoles[offset+2] = sphericalDipole[0]*vectorZ.y + sphericalDipole[1]*vectorX.y + sphericalDipole[2]*vectorY.y;
-            
-            // Now the quadrupoles.
 
+
+            // Now the quadrupoles.
             offset = 5*atom;
             real sphericalQuadrupole[5];
             sphericalQuadrupole[0] = sphericalQuadrupoles[offset];
@@ -385,8 +370,8 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
             real sqrtFourTenths = SQRT((real) 0.4f);
             real sqrtSixTenths = SQRT((real) 0.6f);
 
-            rotatedOctopole[0] = 
-                  sphericalOctopole[0]*((-3*vectorX.z*vectorX.z*vectorZ.z)/2 - (3*vectorY.z*vectorY.z*vectorZ.z)/2 + vectorZ.z*vectorZ.z*vectorZ.z) 
+            rotatedOctopole[0] =
+                  sphericalOctopole[0]*((-3*vectorX.z*vectorX.z*vectorZ.z)/2 - (3*vectorY.z*vectorY.z*vectorZ.z)/2 + vectorZ.z*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[1]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorX.z)/2 - (sqrtThreeHalves*vectorX.z*vectorY.z*vectorY.z)/2  + sqrtSix*vectorX.z*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[2]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorY.z)/2 - (sqrtThreeHalves*vectorY.z*vectorY.z*vectorY.z)/2 + sqrtSix*vectorY.z*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[3]*((sqrtFifteen*vectorX.z*vectorX.z*vectorZ.z)/2 - (sqrtFifteen*vectorY.z*vectorY.z*vectorZ.z)/2)
@@ -394,7 +379,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 + sphericalOctopole[5]*((sqrtFiveHalves*vectorX.z*vectorX.z*vectorX.z)/2 - (3*sqrtFiveHalves*vectorX.z*vectorY.z*vectorY.z)/2)
                 + sphericalOctopole[6]*((3*sqrtFiveHalves*vectorX.z*vectorX.z*vectorY.z)/2 - (sqrtFiveHalves*vectorY.z*vectorY.z*vectorY.z)/2);
 
-            rotatedOctopole[1] = 
+            rotatedOctopole[1] =
                   sphericalOctopole[0]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorZ.x)/2 - (sqrtThreeHalves*vectorY.z*vectorY.z*vectorZ.x)/2 - sqrtThreeHalves*vectorX.x*vectorX.z*vectorZ.z - sqrtThreeHalves*vectorY.x*vectorY.z*vectorZ.z + sqrtThreeHalves*vectorZ.x*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[1]*((-3*vectorX.x*vectorX.z*vectorX.z)/4 - (vectorX.z*vectorY.x*vectorY.z)/2 - (vectorX.x*vectorY.z*vectorY.z)/4 + 2*vectorX.z*vectorZ.x*vectorZ.z + vectorX.x*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[2]*(-(vectorX.z*vectorX.z*vectorY.x)/4 - (vectorX.x*vectorX.z*vectorY.z)/2 - (3*vectorY.x*vectorY.z*vectorY.z)/4 + 2*vectorY.z*vectorZ.x*vectorZ.z + vectorY.x*vectorZ.z*vectorZ.z)
@@ -403,7 +388,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 + sphericalOctopole[5]*((sqrtFifteen*vectorX.x*vectorX.z*vectorX.z)/4 - (sqrtFifteen*vectorX.z*vectorY.x*vectorY.z)/2 - (sqrtFifteen*vectorX.x*vectorY.z*vectorY.z)/4)
                 + sphericalOctopole[6]*((sqrtFifteen*vectorX.z*vectorX.z*vectorY.x)/4 + (sqrtFifteen*vectorX.x*vectorX.z*vectorY.z)/2 - (sqrtFifteen*vectorY.x*vectorY.z*vectorY.z)/4);
 
-            rotatedOctopole[2] = 
+            rotatedOctopole[2] =
                   sphericalOctopole[0]*(-(sqrtThreeHalves*vectorX.z*vectorX.z*vectorZ.y)/2 - (sqrtThreeHalves*vectorY.z*vectorY.z*vectorZ.y)/2 - sqrtThreeHalves*vectorX.y*vectorX.z*vectorZ.z - sqrtThreeHalves*vectorY.y*vectorY.z*vectorZ.z + sqrtThreeHalves*vectorZ.y*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[1]*((-3*vectorX.y*vectorX.z*vectorX.z)/4 - (vectorX.z*vectorY.y*vectorY.z)/2 - (vectorX.y*vectorY.z*vectorY.z)/4 + 2*vectorX.z*vectorZ.y*vectorZ.z + vectorX.y*vectorZ.z*vectorZ.z)
                 + sphericalOctopole[2]*(-(vectorX.z*vectorX.z*vectorY.y)/4 - (vectorX.y*vectorX.z*vectorY.z)/2 - (3*vectorY.y*vectorY.z*vectorY.z)/4 + 2*vectorY.z*vectorZ.y*vectorZ.z + vectorY.y*vectorZ.z*vectorZ.z)
@@ -412,7 +397,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 + sphericalOctopole[5]*((sqrtFifteen*vectorX.y*vectorX.z*vectorX.z)/4 - (sqrtFifteen*vectorX.z*vectorY.y*vectorY.z)/2 - (sqrtFifteen*vectorX.y*vectorY.z*vectorY.z)/4)
                 + sphericalOctopole[6]*((sqrtFifteen*vectorX.z*vectorX.z*vectorY.y)/4 + (sqrtFifteen*vectorX.y*vectorX.z*vectorY.z)/2 - (sqrtFifteen*vectorY.y*vectorY.z*vectorY.z)/4);
 
-            rotatedOctopole[3] = 
+            rotatedOctopole[3] =
                   sphericalOctopole[0]*(-(sqrtSixTenths*vectorX.x*vectorX.z*vectorZ.x) - sqrtSixTenths*vectorY.x*vectorY.z*vectorZ.x + sqrtSixTenths*vectorX.y*vectorX.z*vectorZ.y + sqrtSixTenths*vectorY.y*vectorY.z*vectorZ.y - (sqrtSixTenths*vectorX.x*vectorX.x*vectorZ.z)/2 + (sqrtSixTenths*vectorX.y*vectorX.y*vectorZ.z)/2 - (sqrtSixTenths*vectorY.x*vectorY.x*vectorZ.z)/2 + (sqrtSixTenths*vectorY.y*vectorY.y*vectorZ.z)/2 + sqrtSixTenths*vectorZ.x*vectorZ.x*vectorZ.z - sqrtSixTenths*vectorZ.y*vectorZ.y*vectorZ.z)
                 + sphericalOctopole[1]*((-3*vectorX.x*vectorX.x*vectorX.z)/(2*sqrtTen) + (3*vectorX.y*vectorX.y*vectorX.z)/(2*sqrtTen) - (vectorX.z*vectorY.x*vectorY.x)/(2*sqrtTen) + (vectorX.z*vectorY.y*vectorY.y)/(2*sqrtTen) - (vectorX.x*vectorY.x*vectorY.z)/sqrtTen + (vectorX.y*vectorY.y*vectorY.z)/sqrtTen + sqrtFourTenths*vectorX.z*vectorZ.x*vectorZ.x - sqrtFourTenths*vectorX.z*vectorZ.y*vectorZ.y + 2*sqrtFourTenths*vectorX.x*vectorZ.x*vectorZ.z - 2*sqrtFourTenths*vectorX.y*vectorZ.y*vectorZ.z)
                 + sphericalOctopole[2]*(-((vectorX.x*vectorX.z*vectorY.x)/sqrtTen) + (vectorX.y*vectorX.z*vectorY.y)/sqrtTen - (vectorX.x*vectorX.x*vectorY.z)/(2*sqrtTen) + (vectorX.y*vectorX.y*vectorY.z)/(2*sqrtTen) - (3*vectorY.x*vectorY.x*vectorY.z)/(2*sqrtTen) + (3*vectorY.y*vectorY.y*vectorY.z)/(2*sqrtTen) + sqrtFourTenths*vectorY.z*vectorZ.x*vectorZ.x - sqrtFourTenths*vectorY.z*vectorZ.y*vectorZ.y + 2*sqrtFourTenths*vectorY.x*vectorZ.x*vectorZ.z - 2*sqrtFourTenths*vectorY.y*vectorZ.y*vectorZ.z)
@@ -421,8 +406,8 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 + sphericalOctopole[5]* ((sqrtThreeHalves*vectorX.x*vectorX.x*vectorX.z)/2 - (sqrtThreeHalves*vectorX.y*vectorX.y*vectorX.z)/2 - (sqrtThreeHalves*vectorX.z*vectorY.x*vectorY.x)/2 + (sqrtThreeHalves*vectorX.z*vectorY.y*vectorY.y)/2 - sqrtThreeHalves*vectorX.x*vectorY.x*vectorY.z + sqrtThreeHalves*vectorX.y*vectorY.y*vectorY.z)
                 + sphericalOctopole[6]*(sqrtThreeHalves*vectorX.x*vectorX.z*vectorY.x - sqrtThreeHalves*vectorX.y*vectorX.z*vectorY.y + (sqrtThreeHalves*vectorX.x*vectorX.x*vectorY.z)/2 - (sqrtThreeHalves*vectorX.y*vectorX.y*vectorY.z)/2 - (sqrtThreeHalves*vectorY.x*vectorY.x*vectorY.z)/2 + (sqrtThreeHalves*vectorY.y*vectorY.y*vectorY.z)/2);
 
-            rotatedOctopole[4] = 
-                  sphericalOctopole[0]*(-(sqrtSixTenths*vectorX.y*vectorX.z*vectorZ.x) - sqrtSixTenths*vectorY.y*vectorY.z*vectorZ.x - sqrtSixTenths*vectorX.x*vectorX.z*vectorZ.y - sqrtSixTenths*vectorY.x*vectorY.z*vectorZ.y - sqrtSixTenths*vectorX.x*vectorX.y*vectorZ.z - sqrtSixTenths*vectorY.x*vectorY.y*vectorZ.z + 2*sqrtSixTenths*vectorZ.x*vectorZ.y*vectorZ.z) 
+            rotatedOctopole[4] =
+                  sphericalOctopole[0]*(-(sqrtSixTenths*vectorX.y*vectorX.z*vectorZ.x) - sqrtSixTenths*vectorY.y*vectorY.z*vectorZ.x - sqrtSixTenths*vectorX.x*vectorX.z*vectorZ.y - sqrtSixTenths*vectorY.x*vectorY.z*vectorZ.y - sqrtSixTenths*vectorX.x*vectorX.y*vectorZ.z - sqrtSixTenths*vectorY.x*vectorY.y*vectorZ.z + 2*sqrtSixTenths*vectorZ.x*vectorZ.y*vectorZ.z)
                 + sphericalOctopole[1]*((-3*vectorX.x*vectorX.y*vectorX.z)/sqrtTen - (vectorX.z*vectorY.x*vectorY.y)/sqrtTen - (vectorX.y*vectorY.x*vectorY.z)/sqrtTen - (vectorX.x*vectorY.y*vectorY.z)/sqrtTen + 2*sqrtFourTenths*vectorX.z*vectorZ.x*vectorZ.y + 2*sqrtFourTenths*vectorX.y*vectorZ.x*vectorZ.z + 2*sqrtFourTenths*vectorX.x*vectorZ.y*vectorZ.z)
                 + sphericalOctopole[2]*(-((vectorX.y*vectorX.z*vectorY.x)/sqrtTen) - (vectorX.x*vectorX.z*vectorY.y)/sqrtTen - (vectorX.x*vectorX.y*vectorY.z)/sqrtTen - (3*vectorY.x*vectorY.y*vectorY.z)/sqrtTen + 2*sqrtFourTenths*vectorY.z*vectorZ.x*vectorZ.y + 2*sqrtFourTenths*vectorY.y*vectorZ.x*vectorZ.z + 2*sqrtFourTenths*vectorY.x*vectorZ.y*vectorZ.z)
                 + sphericalOctopole[3]*(vectorX.y*vectorX.z*vectorZ.x - vectorY.y*vectorY.z*vectorZ.x + vectorX.x*vectorX.z*vectorZ.y - vectorY.x*vectorY.z*vectorZ.y + vectorX.x*vectorX.y*vectorZ.z - vectorY.x*vectorY.y*vectorZ.z)
@@ -430,7 +415,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 + sphericalOctopole[5]*(sqrtThreeHalves*vectorX.x*vectorX.y*vectorX.z - sqrtThreeHalves*vectorX.z*vectorY.x*vectorY.y - sqrtThreeHalves*vectorX.y*vectorY.x*vectorY.z - sqrtThreeHalves*vectorX.x*vectorY.y*vectorY.z)
                 + sphericalOctopole[6]*(sqrtThreeHalves*vectorX.y*vectorX.z*vectorY.x + sqrtThreeHalves*vectorX.x*vectorX.z*vectorY.y + sqrtThreeHalves*vectorX.x*vectorX.y*vectorY.z - sqrtThreeHalves*vectorY.x*vectorY.y*vectorY.z);
 
-            rotatedOctopole[5] = 
+            rotatedOctopole[5] =
                   sphericalOctopole[0]*((-3*vectorX.x*vectorX.x*vectorZ.x)/(2*sqrtTen) + (3*vectorX.y*vectorX.y*vectorZ.x)/(2*sqrtTen) - (3*vectorY.x*vectorY.x*vectorZ.x)/(2*sqrtTen) + (3*vectorY.y*vectorY.y*vectorZ.x)/(2*sqrtTen) + vectorZ.x*vectorZ.x*vectorZ.x/sqrtTen + (3*vectorX.x*vectorX.y*vectorZ.y)/sqrtTen + (3*vectorY.x*vectorY.y*vectorZ.y)/sqrtTen - (3*vectorZ.x*vectorZ.y*vectorZ.y)/sqrtTen)
                 + sphericalOctopole[1]*(-(sqrtSixTenths*vectorX.x*vectorX.x*vectorX.x)/4 + (3*sqrtSixTenths*vectorX.x*vectorX.y*vectorX.y)/4 - (sqrtSixTenths*vectorX.x*vectorY.x*vectorY.x)/4 + (sqrtSixTenths*vectorX.y*vectorY.x*vectorY.y)/2 + (sqrtSixTenths*vectorX.x*vectorY.y*vectorY.y)/4 + sqrtSixTenths*vectorX.x*vectorZ.x*vectorZ.x - 2*sqrtSixTenths*vectorX.y*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorX.x*vectorZ.y*vectorZ.y)
                 + sphericalOctopole[2]*(-(sqrtSixTenths*vectorX.x*vectorX.x*vectorY.x)/4 + (sqrtSixTenths*vectorX.y*vectorX.y*vectorY.x)/4 - (sqrtSixTenths*vectorY.x*vectorY.x*vectorY.x)/4 + (sqrtSixTenths*vectorX.x*vectorX.y*vectorY.y)/2 + (3*sqrtSixTenths*vectorY.x*vectorY.y*vectorY.y)/4 + sqrtSixTenths*vectorY.x*vectorZ.x*vectorZ.x - 2*sqrtSixTenths*vectorY.y*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorY.x*vectorZ.y*vectorZ.y)
@@ -439,7 +424,7 @@ extern "C" __global__ void computeLabFrameMoments(real4* __restrict__ posq, int4
                 + sphericalOctopole[5]*(vectorX.x*vectorX.x*vectorX.x/4 - (3*vectorX.x*vectorX.y*vectorX.y)/4 - (3*vectorX.x*vectorY.x*vectorY.x)/4 + (3*vectorX.y*vectorY.x*vectorY.y)/2 + (3*vectorX.x*vectorY.y*vectorY.y)/4)
                 + sphericalOctopole[6]*((3*vectorX.x*vectorX.x*vectorY.x)/4 - (3*vectorX.y*vectorX.y*vectorY.x)/4 - vectorY.x*vectorY.x*vectorY.x/4 - (3*vectorX.x*vectorX.y*vectorY.y)/2 + (3*vectorY.x*vectorY.y*vectorY.y)/4);
 
-            rotatedOctopole[6] = 
+            rotatedOctopole[6] =
                   sphericalOctopole[0]* ((-3*vectorX.x*vectorX.y*vectorZ.x)/sqrtTen - (3*vectorY.x*vectorY.y*vectorZ.x)/sqrtTen - (3*vectorX.x*vectorX.x*vectorZ.y)/(2*sqrtTen) + (3*vectorX.y*vectorX.y*vectorZ.y)/(2*sqrtTen) - (3*vectorY.x*vectorY.x*vectorZ.y)/(2*sqrtTen) + (3*vectorY.y*vectorY.y*vectorZ.y)/(2*sqrtTen) + (3*vectorZ.x*vectorZ.x*vectorZ.y)/sqrtTen - vectorZ.y*vectorZ.y*vectorZ.y/sqrtTen)
                 + sphericalOctopole[1]*((-3*sqrtSixTenths*vectorX.x*vectorX.x*vectorX.y)/4 + (sqrtSixTenths*vectorX.y*vectorX.y*vectorX.y)/4 - (sqrtSixTenths*vectorX.y*vectorY.x*vectorY.x)/4 - (sqrtSixTenths*vectorX.x*vectorY.x*vectorY.y)/2 + (sqrtSixTenths*vectorX.y*vectorY.y*vectorY.y)/4 + sqrtSixTenths*vectorX.y*vectorZ.x*vectorZ.x + 2*sqrtSixTenths*vectorX.x*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorX.y*vectorZ.y*vectorZ.y)
                 + sphericalOctopole[2]*(-(sqrtSixTenths*vectorX.x*vectorX.y*vectorY.x)/2 - (sqrtSixTenths*vectorX.x*vectorX.x*vectorY.y)/4 + (sqrtSixTenths*vectorX.y*vectorX.y*vectorY.y)/4 - (3*sqrtSixTenths*vectorY.x*vectorY.x*vectorY.y)/4 + (sqrtSixTenths*vectorY.y*vectorY.y*vectorY.y)/4 + sqrtSixTenths*vectorY.y*vectorZ.x*vectorZ.x + 2*sqrtSixTenths*vectorY.x*vectorZ.x*vectorZ.y - sqrtSixTenths*vectorY.y*vectorZ.y*vectorZ.y)
@@ -518,26 +503,26 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
     const int VS = 10;
     const int WS = 11;
     const int LastVectorIndex = 12;
-    
+
     const int X = 0;
     const int Y = 1;
     const int Z = 2;
     const int I = 3;
-    
+
     const real torqueScale = RECIP((double) 0x100000000);
-    
+
     real3 forces[4];
     real norms[LastVectorIndex];
     real3 vector[LastVectorIndex];
     real angles[LastVectorIndex][2];
-  
+
     for (int atom = blockIdx.x*blockDim.x + threadIdx.x; atom < NUM_ATOMS; atom += gridDim.x*blockDim.x) {
         int4 particles = multipoleParticles[atom];
         int axisAtom = particles.z;
         int axisType = particles.w;
-    
+
         // NoAxisType
-    
+
         if (axisType < 5 && particles.z >= 0) {
             real3 atomPos = trimTo3(posq[atom]);
             vector[U] = atomPos - trimTo3(posq[axisAtom]);
@@ -551,40 +536,40 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
                     vector[V] = make_real3(0, 1, 0);
             }
             norms[V] = normVector(vector[V]);
-        
+
             // W = UxV
-        
+
             if (axisType < 2 || axisType > 3)
                 vector[W] = cross(vector[U], vector[V]);
             else
                 vector[W] = atomPos - trimTo3(posq[particles.y]);
             norms[W] = normVector(vector[W]);
-        
+
             vector[UV] = cross(vector[V], vector[U]);
             vector[UW] = cross(vector[W], vector[U]);
             vector[VW] = cross(vector[W], vector[V]);
-        
+
             norms[UV] = normVector(vector[UV]);
             norms[UW] = normVector(vector[UW]);
             norms[VW] = normVector(vector[VW]);
-        
+
             angles[UV][0] = dot(vector[U], vector[V]);
             angles[UV][1] = SQRT(1 - angles[UV][0]*angles[UV][0]);
-        
+
             angles[UW][0] = dot(vector[U], vector[W]);
             angles[UW][1] = SQRT(1 - angles[UW][0]*angles[UW][0]);
-        
+
             angles[VW][0] = dot(vector[V], vector[W]);
             angles[VW][1] = SQRT(1 - angles[VW][0]*angles[VW][0]);
-        
+
             real dphi[3];
             real3 torque = make_real3(torqueScale*torqueBuffers[atom], torqueScale*torqueBuffers[atom+PADDED_NUM_ATOMS], torqueScale*torqueBuffers[atom+PADDED_NUM_ATOMS*2]);
             dphi[U] = -dot(vector[U], torque);
             dphi[V] = -dot(vector[V], torque);
             dphi[W] = -dot(vector[W], torque);
-        
+
             // z-then-x and bisector
-        
+
             if (axisType == 0 || axisType == 1) {
                 real factor1 = dphi[V]/(norms[U]*angles[UV][1]);
                 real factor2 = dphi[W]/(norms[U]);
@@ -601,36 +586,36 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
             }
             else if (axisType == 2) {
                 // z-bisect
-        
-                vector[R] = vector[V] + vector[W]; 
-        
+
+                vector[R] = vector[V] + vector[W];
+
                 vector[S] = cross(vector[U], vector[R]);
-        
+
                 norms[R] = normVector(vector[R]);
                 norms[S] = normVector(vector[S]);
-        
+
                 vector[UR] = cross(vector[R], vector[U]);
                 vector[US] = cross(vector[S], vector[U]);
                 vector[VS] = cross(vector[S], vector[V]);
                 vector[WS] = cross(vector[S], vector[W]);
-        
+
                 norms[UR] = normVector(vector[UR]);
                 norms[US] = normVector(vector[US]);
                 norms[VS] = normVector(vector[VS]);
                 norms[WS] = normVector(vector[WS]);
-        
+
                 angles[UR][0] = dot(vector[U], vector[R]);
                 angles[UR][1] = SQRT(1 - angles[UR][0]*angles[UR][0]);
-        
+
                 angles[US][0] = dot(vector[U], vector[S]);
                 angles[US][1] = SQRT(1 - angles[US][0]*angles[US][0]);
-        
+
                 angles[VS][0] = dot(vector[V], vector[S]);
                 angles[VS][1] = SQRT(1 - angles[VS][0]*angles[VS][0]);
-        
+
                 angles[WS][0] = dot(vector[W], vector[S]);
                 angles[WS][1] = SQRT(1 - angles[WS][0]*angles[WS][0]);
-         
+
                 real3 t1 = vector[V] - vector[S]*angles[VS][0];
                 real3 t2 = vector[W] - vector[S]*angles[WS][0];
                 normVector(t1);
@@ -639,10 +624,10 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
                 real ut1sin = SQRT(1 - ut1cos*ut1cos);
                 real ut2cos = dot(vector[U], t2);
                 real ut2sin = SQRT(1 - ut2cos*ut2cos);
-        
+
                 real dphiR = -dot(vector[R], torque);
                 real dphiS = -dot(vector[S], torque);
-        
+
                 real factor1 = dphiR/(norms[U]*angles[UR][1]);
                 real factor2 = dphiS/(norms[U]);
                 real factor3 = dphi[U]/(norms[V]*(ut1sin+ut2sin));
@@ -654,7 +639,7 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
             }
             else if (axisType == 3) {
                 // 3-fold
-        
+
                 forces[Z] = (vector[UW]*dphi[W]/(norms[U]*angles[UW][1]) +
                             vector[UV]*dphi[V]/(norms[U]*angles[UV][1]) -
                             vector[UW]*dphi[U]/(norms[U]*angles[UW][1]) -
@@ -673,7 +658,7 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
             }
             else if (axisType == 4) {
                 // z-only
-        
+
                 forces[Z] = vector[UV]*dphi[V]/(norms[U]*angles[UV][1]) + vector[UW]*dphi[W]/norms[U];
                 forces[X] = make_real3(0);
                 forces[Y] = make_real3(0);
@@ -685,9 +670,9 @@ extern "C" __global__ void mapTorqueToForce(unsigned long long* __restrict__ for
                 forces[Y] = make_real3(0);
                 forces[I] = make_real3(0);
             }
-        
+
             // Store results
-        
+
             atomicAdd(&forceBuffers[particles.z], static_cast<unsigned long long>((long long) (forces[Z].x*0x100000000)));
             atomicAdd(&forceBuffers[particles.z+PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (forces[Z].y*0x100000000)));
             atomicAdd(&forceBuffers[particles.z+2*PADDED_NUM_ATOMS], static_cast<unsigned long long>((long long) (forces[Z].z*0x100000000)));
@@ -724,9 +709,9 @@ extern "C" __global__ void computePotentialAtPoints(const real4* __restrict__ po
         real p = 0;
         for (int baseAtom = 0; baseAtom < NUM_ATOMS; baseAtom += blockDim.x) {
             int atom = baseAtom+threadIdx.x;
-            
+
             // Load data into shared memory.
-            
+
             if (atom < NUM_ATOMS) {
                 localPosq[threadIdx.x] = posq[atom];
                 localDipole[threadIdx.x] = make_real3(labFrameDipole[3*atom], labFrameDipole[3*atom+1], labFrameDipole[3*atom+2]);
@@ -738,7 +723,7 @@ extern "C" __global__ void computePotentialAtPoints(const real4* __restrict__ po
                 localQuadrupole[5*threadIdx.x+4] = labFrameQuadrupole[5*atom+4];
             }
             __syncthreads();
-            
+
             // Loop over atoms and compute the potential at this point.
 
             if (point < numPoints) {

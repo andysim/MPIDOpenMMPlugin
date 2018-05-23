@@ -198,7 +198,7 @@ private:
     CUfunction initExtrapolatedKernel, iterateExtrapolatedKernel, computeExtrapolatedKernel, addExtrapolatedGradientKernel;
     CUfunction pmeTransformMultipolesKernel, pmeTransformPotentialKernel;
     CUevent syncEvent;
-    static const int PmeOrder = 5;
+    static const int PmeOrder = 6;
     static const int MaxPrevDIISDipoles = 20;
 };
 

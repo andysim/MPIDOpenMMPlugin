@@ -72,44 +72,37 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
         real bn1 = (bn0+alsq2n*exp2a)/r2;
         alsq2n *= alsq2;
         real bn2 = (3*bn1+alsq2n*exp2a)/r2;
-        alsq2n *= alsq2;
-        real bn3 = (5*bn2+alsq2n*exp2a)/r2;
 
         // compute the error function scaled and unscaled terms
 
-        real scale3 = 1;
-        real scale5 = 1;
-        real scale7 = 1;
         real damp = std::abs(atom1.damp*atom2.damp);
-        if (damp != 0) {
-            real ratio = (r/damp);
-            ratio = ratio*ratio*ratio;
-            real pgamma = (atom1.thole < atom2.thole ? atom1.thole : atom2.thole);
-            damp = -pgamma*ratio;
-            if (damp > -50) {
-                real expdamp = EXP(damp);
-                scale3 = 1 - expdamp;
-                scale5 = 1 - expdamp*(1-damp);
-                scale7 = 1 - expdamp*(1-damp+(0.6f*damp*damp));
-            }
-        }
+        real pgamma = (pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH);
+        real dfac = (damp == 0 ? 1e16 : pgamma * r / damp); // TODO the inverses should be computed at parse time
+        real expdamp = (dfac < 50 ? EXP(-dfac) : 0);
+
+        real scale3 = 1 - expdamp*(1 + dfac + 0.5f*dfac*dfac);
+        real scale5 = 1 - expdamp*(1 + dfac + 0.5f*dfac*dfac + dfac*dfac*dfac/6);
 
         real psc3 = pScale*scale3;
         real psc5 = pScale*scale5;
-        real psc7 = pScale*scale7;
 
         real r3 = r*r2;
         real r5 = r3*r2;
-        real r7 = r5*r2;
 
         real prr3 = (1-psc3)/r3;
         real prr5 = 3*(1-psc5)/r5;
-        real prr7 = 15*(1-psc7)/r7;
 
         real dir = dot(atom1.dipole, deltaR);
         real dkr = dot(atom2.dipole, deltaR);
 
 #ifdef INCLUDE_QUADRUPOLES
+        alsq2n *= alsq2;
+        real bn3 = (5*bn2+alsq2n*exp2a)/r2;
+        real scale7 = 1 - expdamp*(1 + dfac + 0.5f*dfac*dfac + dfac*dfac*dfac/6 + dfac*dfac*dfac*dfac/30);
+        real psc7 = pScale*scale7;
+        real r7 = r5*r2;
+        real prr7 = 15*(1-psc7)/r7;
+
         real3 qi;
         qi.x = atom1.quadrupoleXX*deltaR.x + atom1.quadrupoleXY*deltaR.y + atom1.quadrupoleXZ*deltaR.z;
         qi.y = atom1.quadrupoleXY*deltaR.x + atom1.quadrupoleYY*deltaR.y + atom1.quadrupoleYZ*deltaR.z;
@@ -126,14 +119,48 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
         real3 fkm = deltaR*(bn1*atom1.posq.w+bn2*dir+bn3*qir) - bn1*atom1.dipole - 2*bn2*qi;
         real3 fip = -deltaR*(prr3*atom2.posq.w-prr5*dkr+prr7*qkr) - prr3*atom2.dipole + 2*prr5*qk;
         real3 fkp = deltaR*(prr3*atom1.posq.w+prr5*dir+prr7*qir) - prr3*atom1.dipole - 2*prr5*qi;
+#ifdef INCLUDE_OCTOPOLES
+        alsq2n *= alsq2;
+        real bn4 = (7*bn3+alsq2n*exp2a)/r2;
+        real scale9 = 1 - expdamp*(1 + dfac + 0.5f*dfac*dfac + dfac*dfac*dfac/6 + 4*dfac*dfac*dfac*dfac/105 + dfac*dfac*dfac*dfac*dfac/210);
+        real psc9 = pScale*scale9;
+        real r9 = r7*r2;
+        real prr9 = 105*(1-psc9)/r9;
+
+        real3 oxx = make_real3(atom2.octopoleXXX, atom2.octopoleXXY, atom2.octopoleXXZ);
+        real3 oxy = make_real3(atom2.octopoleXXY, atom2.octopoleXYY, atom2.octopoleXYZ);
+        real3 oxz = make_real3(atom2.octopoleXXZ, atom2.octopoleXYZ, atom2.octopoleXZZ);
+        real3 oyy = make_real3(atom2.octopoleXYY, atom2.octopoleYYY, atom2.octopoleYYZ);
+        real3 oyz = make_real3(atom2.octopoleXYZ, atom2.octopoleYYZ, atom2.octopoleYZZ);
+        real3 ozz = make_real3(atom2.octopoleXZZ, atom2.octopoleYZZ, atom2.octopoleZZZ);
+        real3 ox  = make_real3(dot(oxx,deltaR), dot(oxy,deltaR), dot(oxz,deltaR));
+        real3 oy  = make_real3(dot(oxy,deltaR), dot(oyy,deltaR), dot(oyz,deltaR));
+        real3 oz  = make_real3(dot(oxz,deltaR), dot(oyz,deltaR), dot(ozz,deltaR));
+        real3 o   = make_real3(dot(ox,deltaR), dot(oy,deltaR), dot(oz,deltaR));
+        fim += -o*(3*bn3) + deltaR*bn4*dot(o,deltaR);
+        fip += -o*(3*prr7) + deltaR*prr9*dot(o,deltaR);
+
+        oxx = make_real3(atom1.octopoleXXX, atom1.octopoleXXY, atom1.octopoleXXZ);
+        oxy = make_real3(atom1.octopoleXXY, atom1.octopoleXYY, atom1.octopoleXYZ);
+        oxz = make_real3(atom1.octopoleXXZ, atom1.octopoleXYZ, atom1.octopoleXZZ);
+        oyy = make_real3(atom1.octopoleXYY, atom1.octopoleYYY, atom1.octopoleYYZ);
+        oyz = make_real3(atom1.octopoleXYZ, atom1.octopoleYYZ, atom1.octopoleYZZ);
+        ozz = make_real3(atom1.octopoleXZZ, atom1.octopoleYZZ, atom1.octopoleZZZ);
+        ox  = make_real3(dot(oxx,deltaR), dot(oxy,deltaR), dot(oxz,deltaR));
+        oy  = make_real3(dot(oxy,deltaR), dot(oyy,deltaR), dot(oyz,deltaR));
+        oz  = make_real3(dot(oxz,deltaR), dot(oyz,deltaR), dot(ozz,deltaR));
+        o   = make_real3(dot(ox,deltaR), dot(oy,deltaR), dot(oz,deltaR));
+        fkm += -o*(3*bn3) + deltaR*bn4*dot(o,deltaR);
+        fkp += -o*(3*prr7) + deltaR*prr9*dot(o,deltaR);
+#endif // End INCLUDE_OCTOPOLES
 #else
+        // Charge-only routine
         real3 fim = -deltaR*(bn1*atom2.posq.w-bn2*dkr) - bn1*atom2.dipole;
         real3 fkm = deltaR*(bn1*atom1.posq.w+bn2*dir) - bn1*atom1.dipole;
         real3 fip = -deltaR*(prr3*atom2.posq.w-prr5*dkr) - prr3*atom2.dipole;
         real3 fkp = deltaR*(prr3*atom1.posq.w+prr5*dir) - prr3*atom1.dipole;
 #endif
         // increment the field at each site due to this interaction
-
         fields[0] = fim-fip;
         fields[1] = fkm-fkp;
     }
@@ -162,7 +189,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
         // get scaling factors
       
         real ratio = r/damp;
-        float pGamma  = pScale == 0.0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
+        float pGamma  = pScale == 0.0f ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
         damp = ratio*pGamma;
         dampExp = EXP(-damp);
     }
@@ -377,11 +404,11 @@ extern "C" __global__ void computeFixedField(
 
         // Extract the coordinates of this tile.
         
-        int x, y;
+        int x;
 #ifdef USE_CUTOFF
         x = tiles[pos];
 #else
-        y = (int) floor(NUM_BLOCKS+0.5f-SQRT((NUM_BLOCKS+0.5f)*(NUM_BLOCKS+0.5f)-2*pos));
+        int y = (int) floor(NUM_BLOCKS+0.5f-SQRT((NUM_BLOCKS+0.5f)*(NUM_BLOCKS+0.5f)-2*pos));
         x = (pos-y*NUM_BLOCKS+y*(y+1)/2);
         if (x < y || x >= NUM_BLOCKS) { // Occasionally happens due to roundoff error.
             y += (x < y ? -1 : 1);

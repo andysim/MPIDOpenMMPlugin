@@ -1613,18 +1613,18 @@ int main(int numberOfArguments, char* argv[]) {
         std::cout << "TestReferenceMPIDForce running test..." << std::endl;
         registerMPIDReferenceKernelFactories();
 
-        //testWaterDimerEnergyAndForcesPMEDirect();
-        //testWaterDimerEnergyAndForcesNoCutDirect();
-        //testWaterDimerEnergyAndForcesPMEMutual();
-        //testWaterDimerEnergyAndForcesNoCutMutual();
-        //testWaterDimerEnergyAndForcesPMEExtrapolated();
-        //testWaterDimerEnergyAndForcesNoCutExtrapolated();
-        //testMethanolDimerEnergyAndForcesPMEExtrapolated();
+        testWaterDimerEnergyAndForcesPMEDirect();
+        testWaterDimerEnergyAndForcesNoCutDirect();
+        testWaterDimerEnergyAndForcesPMEMutual();
+        testWaterDimerEnergyAndForcesNoCutMutual();
+        testWaterDimerEnergyAndForcesPMEExtrapolated();
+        testWaterDimerEnergyAndForcesNoCutExtrapolated();
+        testMethanolDimerEnergyAndForcesPMEExtrapolated();
         testMethanolDimerEnergyAndForcesNoCutExtrapolated();
-        //testMethanolDimerEnergyAndForcesPMEDirect();
-        //testMethanolDimerEnergyAndForcesNoCutDirect();
-        //testMethanolDimerEnergyAndForcesPMEMutual();
-        //testMethanolDimerEnergyAndForcesNoCutMutual();
+        testMethanolDimerEnergyAndForcesPMEDirect();
+        testMethanolDimerEnergyAndForcesNoCutDirect();
+        testMethanolDimerEnergyAndForcesPMEMutual();
+        testMethanolDimerEnergyAndForcesNoCutMutual();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;

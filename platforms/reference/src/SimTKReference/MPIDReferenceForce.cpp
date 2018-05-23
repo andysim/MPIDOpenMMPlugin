@@ -2183,10 +2183,6 @@ double MPIDReferenceForce::calculateElectrostatic(const vector<MultipoleParticle
                         torques[i][2] += p*prefac*(_ptDipoleD[l][i][0]*_ptDipoleFieldD[m][3*i+1]
                                                  - _ptDipoleD[l][i][1]*_ptDipoleFieldD[m][3*i+0]);
                     }
-                        if(l==0) printf("%d %d %d %10.6f %10.6f %10.6f\n",i, l, m,
-                                    _ptDipoleFieldD[m][3*i+0],
-                                    _ptDipoleFieldD[m][3*i+1],
-                                    _ptDipoleFieldD[m][3*i+2]);
                 }
             }
         }

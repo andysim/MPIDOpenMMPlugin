@@ -1022,12 +1022,12 @@ void testMethanolDimerEnergyAndForcesPMEDirect() {
     State state = context.getState(State::Forces | State::Energy);
     double energy = state.getPotentialEnergy();
     const vector<Vec3>& forces = state.getForces();
-//    print_energy_and_forces(energy, forces);
+    //print_energy_and_forces(energy, forces);
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
     check_finite_differences(forces, context, positions);
-//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+    //check_full_finite_differences(forces, context, positions, 1E-3, 1E-4);
 }
 
 
@@ -1356,7 +1356,7 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
     double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
-    const double alpha = 3.0;
+    const double alpha = 3.0001;
     const int grid = 64;
     MPIDForce* forceField = new MPIDForce();
 
@@ -1381,6 +1381,7 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
 
     VerletIntegrator integrator(0.01);
     Context context(system, integrator, Platform::getPlatformByName("CUDA"));
+
     context.setPositions(positions);
 
     double refenergy = -2.523318862;
@@ -1395,12 +1396,12 @@ void testWaterDimerEnergyAndForcesPMEDirect() {
     State state = context.getState(State::Forces | State::Energy);
     double energy = state.getPotentialEnergy();
     const vector<Vec3>& forces = state.getForces();
-//    print_energy_and_forces(energy, forces);
+    //print_energy_and_forces(energy, forces);
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
     check_finite_differences(forces, context, positions);
-//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+    //check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
 void testWaterDimerEnergyAndForcesNoCutMutual() {
@@ -1455,7 +1456,7 @@ void testWaterDimerEnergyAndForcesPMEMutual() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
     double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
-    const double alpha = 3.0;
+    const double alpha = 3;
     const int grid = 64;
     MPIDForce* forceField = new MPIDForce();
 
@@ -1496,12 +1497,12 @@ void testWaterDimerEnergyAndForcesPMEMutual() {
     State state = context.getState(State::Forces | State::Energy);
     double energy = state.getPotentialEnergy();
     const vector<Vec3>& forces = state.getForces();
-//    print_energy_and_forces(energy, forces);
+    //print_energy_and_forces(energy, forces);
     ASSERT_EQUAL_TOL(refenergy, energy, 1E-4);
     for (int n = 0; n < numAtoms; ++n)
         ASSERT_EQUAL_VEC(refforces[n], forces[n], 1E-4);
     check_finite_differences(forces, context, positions);
-//    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
+    //check_full_finite_differences(forces, context, positions, 5E-5, 1E-4);
 }
 
 
@@ -1613,17 +1614,17 @@ int main(int argc, char* argv[]) {
         if (argc > 1)
             Platform::getPlatformByName("CUDA").setPropertyDefaultValue("Precision", std::string(argv[1]));
 
-        //testWaterDimerEnergyAndForcesPMEDirect();
+        testWaterDimerEnergyAndForcesPMEDirect();
         testWaterDimerEnergyAndForcesNoCutDirect();
-        //testWaterDimerEnergyAndForcesPMEMutual();
+        testWaterDimerEnergyAndForcesPMEMutual();
         testWaterDimerEnergyAndForcesNoCutMutual();
-        //testWaterDimerEnergyAndForcesPMEExtrapolated();
+        testWaterDimerEnergyAndForcesPMEExtrapolated();
         testWaterDimerEnergyAndForcesNoCutExtrapolated();
-        //testMethanolDimerEnergyAndForcesPMEExtrapolated();
+        testMethanolDimerEnergyAndForcesPMEExtrapolated();
         testMethanolDimerEnergyAndForcesNoCutExtrapolated();
-        //testMethanolDimerEnergyAndForcesPMEDirect();
+        testMethanolDimerEnergyAndForcesPMEDirect();
         testMethanolDimerEnergyAndForcesNoCutDirect();
-        //testMethanolDimerEnergyAndForcesPMEMutual();
+        testMethanolDimerEnergyAndForcesPMEMutual();
         testMethanolDimerEnergyAndForcesNoCutMutual();
     } catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;
