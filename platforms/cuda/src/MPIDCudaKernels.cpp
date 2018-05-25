@@ -245,18 +245,18 @@ void CudaCalcMPIDForceKernel::initialize(const System& system, const MPIDForce& 
         multipoleParticlesVec.push_back(make_int4(atomX, atomY, atomZ, axisType));
         for (int j = 0; j < 3; j++)
             molecularDipolesVec.push_back((float) dipole[j]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[0]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[1]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[2]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[4]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[5]);
-        molecularOctopolesVec.push_back((float) octopole[0]);
-        molecularOctopolesVec.push_back((float) octopole[1]);
-        molecularOctopolesVec.push_back((float) octopole[2]);
-        molecularOctopolesVec.push_back((float) octopole[4]);
-        molecularOctopolesVec.push_back((float) octopole[5]);
-        molecularOctopolesVec.push_back((float) octopole[13]);
-        molecularOctopolesVec.push_back((float) octopole[14]);
+        molecularQuadrupolesVec.push_back((float) quadrupole[0]); // XX
+        molecularQuadrupolesVec.push_back((float) quadrupole[1]); // XY
+        molecularQuadrupolesVec.push_back((float) quadrupole[3]); // XZ
+        molecularQuadrupolesVec.push_back((float) quadrupole[2]); // YY
+        molecularQuadrupolesVec.push_back((float) quadrupole[4]); // YZ
+        molecularOctopolesVec.push_back((float) octopole[0]); // XXX
+        molecularOctopolesVec.push_back((float) octopole[1]); // XXY
+        molecularOctopolesVec.push_back((float) octopole[4]); // XXZ
+        molecularOctopolesVec.push_back((float) octopole[2]); // XYY
+        molecularOctopolesVec.push_back((float) octopole[5]); // XYZ
+        molecularOctopolesVec.push_back((float) octopole[3]); // YYY
+        molecularOctopolesVec.push_back((float) octopole[6]); // YYZ
     }
     hasQuadrupoles = false;
     for (auto q : molecularQuadrupolesVec)
@@ -1369,18 +1369,18 @@ void CudaCalcMPIDForceKernel::copyParametersToContext(ContextImpl& context, cons
         multipoleParticlesVec.push_back(make_int4(atomX, atomY, atomZ, axisType));
         for (int j = 0; j < 3; j++)
             molecularDipolesVec.push_back((float) dipole[j]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[0]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[1]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[2]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[4]);
-        molecularQuadrupolesVec.push_back((float) quadrupole[5]);
-        molecularOctopolesVec.push_back((float) octopole[0]);
-        molecularOctopolesVec.push_back((float) octopole[1]);
-        molecularOctopolesVec.push_back((float) octopole[2]);
-        molecularOctopolesVec.push_back((float) octopole[4]);
-        molecularOctopolesVec.push_back((float) octopole[5]);
-        molecularOctopolesVec.push_back((float) octopole[13]);
-        molecularOctopolesVec.push_back((float) octopole[14]);
+        molecularQuadrupolesVec.push_back((float) quadrupole[0]); // XX
+        molecularQuadrupolesVec.push_back((float) quadrupole[1]); // XY
+        molecularQuadrupolesVec.push_back((float) quadrupole[3]); // XZ
+        molecularQuadrupolesVec.push_back((float) quadrupole[2]); // YY
+        molecularQuadrupolesVec.push_back((float) quadrupole[4]); // YZ
+        molecularOctopolesVec.push_back((float) octopole[0]); // XXX
+        molecularOctopolesVec.push_back((float) octopole[1]); // XXY
+        molecularOctopolesVec.push_back((float) octopole[4]); // XXZ
+        molecularOctopolesVec.push_back((float) octopole[2]); // XYY
+        molecularOctopolesVec.push_back((float) octopole[5]); // XYZ
+        molecularOctopolesVec.push_back((float) octopole[3]); // YYY
+        molecularOctopolesVec.push_back((float) octopole[6]); // YYZ
     }
     if (!hasQuadrupoles) {
         for (auto q : molecularQuadrupolesVec)

@@ -98,10 +98,10 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
         // compute the error function scaled and unscaled terms
 
         real damp = std::abs(atom1.damp*atom2.damp);
-        real ratio = (r/damp);
-        float pgamma = pScale == 0.0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
-        damp = damp == 0 ? 0 : pgamma*ratio;
-        real expdamp = EXP(-damp);
+        real ratio = damp == 0 ? 0 : (r/damp);
+        float pgamma = pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
+        damp = pgamma*ratio;
+        real expdamp = ratio == 0 ? 0 : EXP(-damp);
         real dsc3 = 1 - expdamp*(1 + damp + damp*damp/2);
         real dsc5 = 1 - expdamp*(1 + damp + damp*damp/2 + damp*damp*damp/6);
         real dsc7 = 1 - expdamp*(1 + damp + damp*damp/2 + damp*damp*damp/6 + damp*damp*damp*damp/30);

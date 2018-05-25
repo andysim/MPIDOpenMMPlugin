@@ -163,24 +163,11 @@ void MPIDForce::getMultipoleParameters(int index, double& charge, std::vector<do
     charge                      = multipoles[index].charge;
 
     molecularDipole.resize(3);
-    molecularDipole[0]          = multipoles[index].molecularDipole[0];
-    molecularDipole[1]          = multipoles[index].molecularDipole[1];
-    molecularDipole[2]          = multipoles[index].molecularDipole[2];
-
-    molecularQuadrupole.resize(9);
-    molecularQuadrupole[0]      = multipoles[index].molecularQuadrupole[0];
-    molecularQuadrupole[1]      = multipoles[index].molecularQuadrupole[1];
-    molecularQuadrupole[2]      = multipoles[index].molecularQuadrupole[2];
-    molecularQuadrupole[3]      = multipoles[index].molecularQuadrupole[3];
-    molecularQuadrupole[4]      = multipoles[index].molecularQuadrupole[4];
-    molecularQuadrupole[5]      = multipoles[index].molecularQuadrupole[5];
-    molecularQuadrupole[6]      = multipoles[index].molecularQuadrupole[6];
-    molecularQuadrupole[7]      = multipoles[index].molecularQuadrupole[7];
-    molecularQuadrupole[8]      = multipoles[index].molecularQuadrupole[8];
-
-    molecularOctopole.resize(27);
-    for(int i = 0; i < 27; ++i)
-         molecularOctopole[i] = multipoles[index].molecularOctopole[i];
+    molecularQuadrupole.resize(6);
+    molecularOctopole.resize(10);
+    for(int i = 0; i < 3; ++i) molecularDipole[i] = multipoles[index].molecularDipole[i];
+    for(int i = 0; i < 6; ++i) molecularQuadrupole[i] = multipoles[index].molecularQuadrupole[i];
+    for(int i = 0; i < 10; ++i) molecularOctopole[i] = multipoles[index].molecularOctopole[i];
 
     axisType                    = multipoles[index].axisType;
     multipoleAtomZ              = multipoles[index].multipoleAtomZ;
@@ -196,22 +183,9 @@ void MPIDForce::setMultipoleParameters(int index, double charge, const std::vect
 
     multipoles[index].charge                      = charge;
 
-    multipoles[index].molecularDipole[0]          = molecularDipole[0];
-    multipoles[index].molecularDipole[1]          = molecularDipole[1];
-    multipoles[index].molecularDipole[2]          = molecularDipole[2];
-
-    multipoles[index].molecularQuadrupole[0]      = molecularQuadrupole[0];
-    multipoles[index].molecularQuadrupole[1]      = molecularQuadrupole[1];
-    multipoles[index].molecularQuadrupole[2]      = molecularQuadrupole[2];
-    multipoles[index].molecularQuadrupole[3]      = molecularQuadrupole[3];
-    multipoles[index].molecularQuadrupole[4]      = molecularQuadrupole[4];
-    multipoles[index].molecularQuadrupole[5]      = molecularQuadrupole[5];
-    multipoles[index].molecularQuadrupole[6]      = molecularQuadrupole[6];
-    multipoles[index].molecularQuadrupole[7]      = molecularQuadrupole[7];
-    multipoles[index].molecularQuadrupole[8]      = molecularQuadrupole[8];
-
-    for(int i = 0; i < 27; ++i)
-        multipoles[index].molecularOctopole[i]    = molecularOctopole[i];
+    for(int i = 0; i < 3; ++i) multipoles[index].molecularDipole[i] = molecularDipole[i];
+    for(int i = 0; i < 6; ++i) multipoles[index].molecularQuadrupole[i] = molecularQuadrupole[i];
+    for(int i = 0; i < 10; ++i) multipoles[index].molecularOctopole[i] = molecularOctopole[i];
 
     double dampingFactor = pow((alphas[0]+alphas[1]+alphas[2])/3.0, 1.0/6.0);
     multipoles[index].axisType                    = axisType;

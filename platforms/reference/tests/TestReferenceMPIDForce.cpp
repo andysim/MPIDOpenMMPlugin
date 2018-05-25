@@ -112,50 +112,27 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
     dipolemap["H1"] = hdv;
     dipolemap["H2"] = hdv;
 
-    double oq[9] = {0.000354030721139,  0.0, 0.0,
-                    0.0, -0.000390257077096, 0.0,
-                    0.0, 0.0,  3.62263559571e-05};
-    double hq[9] = {-3.42848248983e-05, 0.0, -1.89485963908e-06,
-                     0.0,          -0.000100240875193,      0.0,
-                    -1.89485963908e-06, 0.0,  0.000134525700091};
+    double oq[6] = {0.000354030721139, 0.0, -0.000390257077096, 0.0, 0.0,  3.62263559571e-05};
+    double hq[6] = {-3.42848248983e-05, 0.0, -0.000100240875193, -1.89485963908e-06, 0.0,  0.000134525700091};
 
-    std::vector<double> oqv(&oq[0], &oq[9]);
-    std::vector<double> hqv(&hq[0], &hq[9]);
+    std::vector<double> oqv(&oq[0], &oq[6]);
+    std::vector<double> hqv(&hq[0], &hq[6]);
     if(!do_qpole){
-        oqv.assign(9, 0);
-        hqv.assign(9, 0);
+        oqv.assign(6, 0);
+        hqv.assign(6, 0);
     }
     quadrupolemap["O"]  = oqv;
     quadrupolemap["H1"] = hqv;
     quadrupolemap["H2"] = hqv;
 
-    double oo[27] = {
-                           0,                    0, -6.285758282686837e-07,
-                           0,                    0,                    0,
-        -6.285758282686837e-07,                    0,                    0,
-                           0,                    0,                    0,
-                           0,                    0, -9.452653225954594e-08,
-                           0, -9.452653225954594e-08,                    0,
-        -6.285758282686837e-07,                    0,                    0,
-                           0, -9.452653225954594e-08,                    0,
-                           0,                    0, 7.231018665791977e-07
-    };
-    double ho[27] = {
-        -2.405600937552608e-07,                    0, -1.152422607026746e-06,
-                           0, -6.415084018183151e-08,                    0,
-        -1.152422607026746e-06,                    0, 3.047102424084479e-07,
-                           0, -6.415084018183151e-08,                    0,
-        -6.415084018183151e-08,                    0, -2.558537436767218e-06,
-                           0, -2.558537436767218e-06,                    0,
-        -1.152422607026746e-06,                    0, 3.047102424084479e-07,
-                           0, -2.558537436767218e-06,                    0,
-        3.047102424084479e-07,                    0, 3.710960043793964e-06
-    };
-    std::vector<double> oov(&oo[0], &oo[27]);
-    std::vector<double> hov(&ho[0], &ho[27]);
+    double oo[10] = { 0, 0, 0, 0, -6.285758282686837e-07, 0, -9.452653225954594e-08, 0, 0, 7.231018665791977e-07};
+    double ho[10] = { -2.405600937552608e-07, 0, -6.415084018183151e-08, 0, -1.152422607026746e-06,
+                      0,  -2.558537436767218e-06, 3.047102424084479e-07, 0, 3.710960043793964e-06 };
+    std::vector<double> oov(&oo[0], &oo[10]);
+    std::vector<double> hov(&ho[0], &ho[10]);
     if(!do_opole){
-        oov.assign(27, 0);
-        hov.assign(27, 0);
+        oov.assign(10, 0);
+        hov.assign(10, 0);
     }
     octopolemap["O"]  = oov;
     octopolemap["H1"] = hov;
@@ -720,21 +697,13 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     dipolemap["H1B"] = zerodv;
     dipolemap["H1C"] = zerodv;
 
-    double oq[9] = {
-          9.383755641232907e-05,                     -0, -1.577493985246555e-06,
-                             -0, -0.0001547997648007625,                      0,
-         -1.577493985246555e-06,                      0,  6.096220838843343e-05
-    };
-    double zeroq[9] = {
-                              0,                      0,                      0,
-                              0,                      0,                      0,
-                              0,                      0,                      0
-    };
+    double oq[6] = { 9.383755641232907e-05, 0, -0.0001547997648007625, -1.577493985246555e-06, 0, 6.096220838843343e-05 };
+    double zeroq[6] = { 0, 0, 0, 0, 0, 0 };
 
-    std::vector<double> oqv(&oq[0], &oq[9]);
-    std::vector<double> zeroqv(&zeroq[0], &zeroq[9]);
+    std::vector<double> oqv(&oq[0], &oq[6]);
+    std::vector<double> zeroqv(&zeroq[0], &zeroq[6]);
     if(!do_qpole){
-        oqv.assign(9, 0);
+        oqv.assign(6, 0);
     }
     quadrupolemap["C1"]  = zeroqv;
     quadrupolemap["O1"]  = oqv;
@@ -743,32 +712,13 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     quadrupolemap["H1B"] = zeroqv;
     quadrupolemap["H1C"] = zeroqv;
 
-    double oo[27] = {
-        -3.230426667733178e-08,                      0, -2.245492298396793e-07,
-                             0,  3.684859776955582e-08,                      0,
-        -2.245492298396793e-07,                      0, -4.445541285871346e-09,
-                             0,  3.684859776955582e-08,                      0,
-         3.684859776955582e-08,                      0,  7.675967953604524e-07,
-                             0,  7.675967953604524e-07,                      0,
-        -2.245492298396793e-07,                      0, -4.445541285871346e-09,
-                             0,  7.675967953604524e-07,                      0,
-        -4.445541285871346e-09,                      0,  -5.43047565520773e-07
-    };
-    double zeroo[27] = {
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0,
-                             0,                      0,                      0
-    };
-    std::vector<double> oov(&oo[0], &oo[27]);
-    std::vector<double> zeroov(&zeroo[0], &zeroo[27]);
+    double oo[10] = { -3.230426667733178e-08, 0,  3.684859776955582e-08, 0, -2.245492298396793e-07,
+                      0, 7.675967953604524e-07,  -4.445541285871346e-09, 0, -5.43047565520773e-07};
+    double zeroo[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    std::vector<double> oov(&oo[0], &oo[10]);
+    std::vector<double> zeroov(&zeroo[0], &zeroo[10]);
     if(!do_opole){
-        oov.assign(27, 0);
+        oov.assign(10, 0);
     }
     octopolemap["C1"]  = zeroov;
     octopolemap["O1"]  = oov;

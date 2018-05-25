@@ -90,10 +90,10 @@ void testSerialization() {
         std::vector<double> molecularQuadrupole;
         std::vector<double> molecularOctopole;
         molecularDipole.push_back(0.1); molecularDipole.push_back(rand()); molecularDipole.push_back(rand());
-        for (unsigned int jj = 0; jj < 9; jj++) {
+        for (unsigned int jj = 0; jj < 6; jj++) {
             molecularQuadrupole.push_back(static_cast<double>(rand()));
         }
-        for (unsigned int jj = 0; jj < 27; jj++) {
+        for (unsigned int jj = 0; jj < 10; jj++) {
             molecularOctopole.push_back(static_cast<double>(rand()));
         }
         force1.addMultipole(static_cast<double>(ii+1), molecularDipole, molecularQuadrupole, molecularOctopole, MPIDForce::Bisector,
@@ -169,16 +169,18 @@ void testSerialization() {
         ASSERT_EQUAL(thole1,                         thole2);
         ASSERT_EQUAL(alphas1,                        alphas2);
 
-        ASSERT_EQUAL(molecularDipole1.size(),        molecularDipole2.size());
-        ASSERT_EQUAL(molecularDipole1.size(),        3);
+        ASSERT_EQUAL(molecularDipole1.size(), molecularDipole2.size());
+        ASSERT_EQUAL(molecularDipole1.size(), 3);
         for (unsigned int jj = 0; jj < molecularDipole1.size(); jj++) {
             ASSERT_EQUAL(molecularDipole1[jj], molecularDipole2[jj]);
         }
-        ASSERT_EQUAL(molecularQuadrupole1.size(),        molecularQuadrupole2.size());
-        ASSERT_EQUAL(molecularQuadrupole1.size(),        9);
+        ASSERT_EQUAL(molecularQuadrupole1.size(), molecularQuadrupole2.size());
+        ASSERT_EQUAL(molecularQuadrupole1.size(), 6);
         for (unsigned int jj = 0; jj < molecularQuadrupole1.size(); jj++) {
             ASSERT_EQUAL(molecularQuadrupole1[jj], molecularQuadrupole2[jj]);
         }
+        ASSERT_EQUAL(molecularOctopole1.size(), molecularOctopole2.size());
+        ASSERT_EQUAL(molecularOctopole1.size(), 10);
         for (unsigned int jj = 0; jj < molecularOctopole1.size(); jj++) {
             ASSERT_EQUAL(molecularOctopole1[jj], molecularOctopole2[jj]);
         }

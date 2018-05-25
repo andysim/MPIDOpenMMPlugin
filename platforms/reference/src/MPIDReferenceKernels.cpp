@@ -87,8 +87,8 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
 
     charges.resize(numMultipoles);
     dipoles.resize(3*numMultipoles);
-    quadrupoles.resize(9*numMultipoles);
-    octopoles.resize(27*numMultipoles);
+    quadrupoles.resize(6*numMultipoles);
+    octopoles.resize(10*numMultipoles);
     tholes.resize(numMultipoles);
     dampingFactors.resize(numMultipoles);
     polarity.resize(numMultipoles);
@@ -126,21 +126,11 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
         dampingFactors[ii]                 = pow((alphasD[0]+alphasD[1]+alphasD[2])/3.0, 1.0/6.0);
         polarity[ii]                       = alphasD;
 
-        dipoles[dipoleIndex++]             = dipolesD[0];
-        dipoles[dipoleIndex++]             = dipolesD[1];
-        dipoles[dipoleIndex++]             = dipolesD[2];
-        
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[0];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[1];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[2];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[3];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[4];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[5];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[6];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[7];
-        quadrupoles[quadrupoleIndex++]     = quadrupolesD[8];
-
-        for(int i = 0; i < 27; ++i)
+        for(int i = 0; i < 3; ++i)
+            dipoles[dipoleIndex++] = dipolesD[i];
+        for(int i = 0; i < 6; ++i)
+            quadrupoles[quadrupoleIndex++] = quadrupolesD[i];
+        for(int i = 0; i < 10; ++i)
             octopoles[octopoleIndex++] = octopolesD[i];
 
         // covalent info
@@ -375,21 +365,12 @@ void ReferenceCalcMPIDForceKernel::copyParametersToContext(ContextImpl& context,
         tholes[i] = tholeD;
         dampingFactors[i] = dampingFactorD;
         polarity[i] = polarityD;
-        dipoles[dipoleIndex++] = dipolesD[0];
-        dipoles[dipoleIndex++] = dipolesD[1];
-        dipoles[dipoleIndex++] = dipolesD[2];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[0];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[1];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[2];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[3];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[4];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[5];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[6];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[7];
-        quadrupoles[quadrupoleIndex++] = quadrupolesD[8];
-        for(int i = 0; i < 27; ++i)
+        for(int i = 0; i < 3; ++i)
+            octopoles[dipoleIndex++] = dipolesD[i];
+        for(int i = 0; i < 6; ++i)
+            octopoles[quadrupoleIndex++] = quadrupolesD[i];
+        for(int i = 0; i < 10; ++i)
             octopoles[octopoleIndex++] = octopolesD[i];
-
     }
 }
 

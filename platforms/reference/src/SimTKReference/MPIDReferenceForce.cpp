@@ -287,60 +287,48 @@ void MPIDReferenceForce::loadParticleData(const vector<Vec3>& particlePositions,
         particleData[ii].position             = particlePositions[ii];
         particleData[ii].charge               = charges[ii];
 
-        particleData[ii].dipole[0]            = dipoles[3*ii+0];
-        particleData[ii].dipole[1]            = dipoles[3*ii+1];
-        particleData[ii].dipole[2]            = dipoles[3*ii+2];
+        double dX = particleData[ii].dipole[0] = dipoles[3*ii+0];
+        double dY = particleData[ii].dipole[1] = dipoles[3*ii+1];
+        double dZ = particleData[ii].dipole[2] = dipoles[3*ii+2];
 
-        particleData[ii].quadrupole[QXX]      = quadrupoles[9*ii+0];
-        particleData[ii].quadrupole[QXY]      = quadrupoles[9*ii+1];
-        particleData[ii].quadrupole[QXZ]      = quadrupoles[9*ii+2];
-        particleData[ii].quadrupole[QYY]      = quadrupoles[9*ii+4];
-        particleData[ii].quadrupole[QYZ]      = quadrupoles[9*ii+5];
-        particleData[ii].quadrupole[QZZ]      = quadrupoles[9*ii+8];
+        double qXX = particleData[ii].quadrupole[QXX] = quadrupoles[6*ii+0];
+        double qXY = particleData[ii].quadrupole[QXY] = quadrupoles[6*ii+1];
+        double qXZ = particleData[ii].quadrupole[QXZ] = quadrupoles[6*ii+3];
+        double qYY = particleData[ii].quadrupole[QYY] = quadrupoles[6*ii+2];
+        double qYZ = particleData[ii].quadrupole[QYZ] = quadrupoles[6*ii+4];
+        double qZZ = particleData[ii].quadrupole[QZZ] = quadrupoles[6*ii+5];
 
-        /* X   0  1  2
-         *     3  4  5
-         *     6  7  8
-         *
-         * Y   9 10 11
-         *    12 13 14
-         *    15 16 17
-         *
-         * Z  18 19 20
-         *    21 22 23
-         *    24 25 26
-         */
-        particleData[ii].octopole[QXXX]       = octopoles[27*ii+0];
-        particleData[ii].octopole[QXXY]       = octopoles[27*ii+1];
-        particleData[ii].octopole[QXXZ]       = octopoles[27*ii+2];
-        particleData[ii].octopole[QXYY]       = octopoles[27*ii+4];
-        particleData[ii].octopole[QXYZ]       = octopoles[27*ii+5];
-        particleData[ii].octopole[QXZZ]       = octopoles[27*ii+8];
-        particleData[ii].octopole[QYYY]       = octopoles[27*ii+13];
-        particleData[ii].octopole[QYYZ]       = octopoles[27*ii+14];
-        particleData[ii].octopole[QYZZ]       = octopoles[27*ii+17];
-        particleData[ii].octopole[QZZZ]       = octopoles[27*ii+26];
+        double oXXX = particleData[ii].octopole[QXXX] = octopoles[10*ii+0];
+        double oXXY = particleData[ii].octopole[QXXY] = octopoles[10*ii+1];
+        double oXXZ = particleData[ii].octopole[QXXZ] = octopoles[10*ii+4];
+        double oXYY = particleData[ii].octopole[QXYY] = octopoles[10*ii+2];
+        double oXYZ = particleData[ii].octopole[QXYZ] = octopoles[10*ii+5];
+        double oXZZ = particleData[ii].octopole[QXZZ] = octopoles[10*ii+7];
+        double oYYY = particleData[ii].octopole[QYYY] = octopoles[10*ii+3];
+        double oYYZ = particleData[ii].octopole[QYYZ] = octopoles[10*ii+6];
+        double oYZZ = particleData[ii].octopole[QYZZ] = octopoles[10*ii+8];
+        double oZZZ = particleData[ii].octopole[QZZZ] = octopoles[10*ii+9];
 
         // Form spherical harmonic dipoles from Cartesian moments.
-        particleData[ii].sphericalDipole[0]  = dipoles[3*ii+2]; // z -> Q_10
-        particleData[ii].sphericalDipole[1]  = dipoles[3*ii+0]; // x -> Q_11c
-        particleData[ii].sphericalDipole[2]  = dipoles[3*ii+1]; // y -> Q_11s
+        particleData[ii].sphericalDipole[0]  = dZ; // z -> Q_10
+        particleData[ii].sphericalDipole[1]  = dX; // x -> Q_11c
+        particleData[ii].sphericalDipole[2]  = dY; // y -> Q_11s
 
         // Form spherical harmonic quadrupoles from Cartesian moments.
-        particleData[ii].sphericalQuadrupole[0] = quadrupoles[9*ii+8]*3.0; // zz -> Q_20
-        particleData[ii].sphericalQuadrupole[1] = sqrtFourThirds * quadrupoles[9*ii+2]*3.0; // xz -> Q_21c
-        particleData[ii].sphericalQuadrupole[2] = sqrtFourThirds * quadrupoles[9*ii+5]*3.0; // yz -> Q_21s
-        particleData[ii].sphericalQuadrupole[3] = sqrtOneThird * (quadrupoles[9*ii+0] - quadrupoles[9*ii+4])*3.0; // xx-yy -> Q_22c
-        particleData[ii].sphericalQuadrupole[4] = sqrtFourThirds * quadrupoles[9*ii+1]*3.0; // xy -> Q_22s
+        particleData[ii].sphericalQuadrupole[0] = qZZ*3; // zz -> Q_20
+        particleData[ii].sphericalQuadrupole[1] = sqrtFourThirds * qXZ * 3; // xz -> Q_21c
+        particleData[ii].sphericalQuadrupole[2] = sqrtFourThirds * qYZ * 3; // yz -> Q_21s
+        particleData[ii].sphericalQuadrupole[3] = sqrtOneThird * (qXX - qYY) * 3; // xx-yy -> Q_22c
+        particleData[ii].sphericalQuadrupole[4] = sqrtFourThirds * qXY * 3; // xy -> Q_22s
 
         // Form spherical harmonic octopoles from Cartesian moments.
-        particleData[ii].sphericalOctopole[0] = octopoles[27*ii+26]*15.0; // zzz -> Q_30
-        particleData[ii].sphericalOctopole[1] = sqrtThreeHalves*octopoles[27*ii+8]*15.0; // xzz -> Q_31c
-        particleData[ii].sphericalOctopole[2] = sqrtThreeHalves*octopoles[27*ii+17]*15.0; // yzz -> Q_31s
-        particleData[ii].sphericalOctopole[3] = sqrtThreeFifths*(octopoles[27*ii+2]-octopoles[27*ii+14])*15.0; // xxz-yyz -> Q_32c
-        particleData[ii].sphericalOctopole[4] = 2.0*sqrtThreeFifths*octopoles[27*ii+5]*15.0; // xyz -> Q_32s
-        particleData[ii].sphericalOctopole[5] = sqrtOneTenth*(octopoles[27*ii+0]-3.0*octopoles[27*ii+4])*15.0; // xxx-xyy -> Q_33c
-        particleData[ii].sphericalOctopole[6] = sqrtOneTenth*(3.0*octopoles[27*ii+1]-octopoles[27*ii+13])*15.0; // xxy-yyy -> Q_33s
+        particleData[ii].sphericalOctopole[0] = oZZZ*15; // zzz -> Q_30
+        particleData[ii].sphericalOctopole[1] = sqrtThreeHalves*oXZZ*15; // xzz -> Q_31c
+        particleData[ii].sphericalOctopole[2] = sqrtThreeHalves*oYZZ*15; // yzz -> Q_31s
+        particleData[ii].sphericalOctopole[3] = sqrtThreeFifths*(oXXZ-oYYZ)*15; // xxz-yyz -> Q_32c
+        particleData[ii].sphericalOctopole[4] = 2*sqrtThreeFifths*oXYZ*15; // xyz -> Q_32s
+        particleData[ii].sphericalOctopole[5] = sqrtOneTenth*(oXXX-3*oXYY)*15; // xxx-xyy -> Q_33c
+        particleData[ii].sphericalOctopole[6] = sqrtOneTenth*(3*oXXY-oYYY)*15; // xxy-yyy -> Q_33s
 
         particleData[ii].thole                = tholes[ii];
         particleData[ii].dampingFactor        = dampingFactors[ii];

@@ -67,6 +67,7 @@ void MPIDForceImpl::initialize(ContextImpl& context) {
     }
 
     double quadrupoleValidationTolerance = 1.0e-05;
+    double octopoleValidationTolerance = 1.0e-05;
     for (int ii = 0; ii < numParticles; ii++) {
 
         int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
@@ -82,38 +83,38 @@ void MPIDForceImpl::initialize(ContextImpl& context) {
 
        // check quadrupole is traceless and symmetric
 
-       double trace = fabs(molecularQuadrupole[0] + molecularQuadrupole[4] + molecularQuadrupole[8]);
+       double trace = fabs(molecularQuadrupole[0] + molecularQuadrupole[2] + molecularQuadrupole[5]);
        if (trace > quadrupoleValidationTolerance) {
              std::stringstream buffer;
-             buffer << "MPIDForce: qudarupole for particle=" << ii;
+             buffer << "MPIDForce: quadrupole for particle=" << ii;
              buffer << " has nonzero trace: " << trace << "; MPID plugin assumes traceless quadrupole.";
              throw OpenMMException(buffer.str());
        }
-       if (fabs(molecularQuadrupole[1] - molecularQuadrupole[3]) > quadrupoleValidationTolerance ) {
+
+       trace = fabs(molecularOctopole[0] + molecularOctopole[2] + molecularOctopole[7]);
+       if (trace > octopoleValidationTolerance) {
              std::stringstream buffer;
-             buffer << "MPIDForce: XY and YX components of quadrupole for particle=" << ii;
-             buffer << "  are not equal: [" << molecularQuadrupole[1] << " " << molecularQuadrupole[3] << "];";
-             buffer << " MPID plugin assumes symmetric quadrupole tensor.";
+             buffer << "MPIDForce: (XXX,XYY,XZZ) octopole for particle=" << ii;
+             buffer << " has nonzero trace: " << trace << "; MPID plugin assumes traceless octopoles.";
              throw OpenMMException(buffer.str());
        }
 
-       if (fabs(molecularQuadrupole[2] - molecularQuadrupole[6]) > quadrupoleValidationTolerance ) {
+       trace = fabs(molecularOctopole[1] + molecularOctopole[3] + molecularOctopole[8]);
+       if (trace > octopoleValidationTolerance) {
              std::stringstream buffer;
-             buffer << "MPIDForce: XZ and ZX components of quadrupole for particle=" << ii;
-             buffer << "  are not equal: [" << molecularQuadrupole[2] << " " << molecularQuadrupole[6] << "];";
-             buffer << " MPID plugin assumes symmetric quadrupole tensor.";
+             buffer << "MPIDForce: (YXX,YYY,YZZ) octopole for particle=" << ii;
+             buffer << " has nonzero trace: " << trace << "; MPID plugin assumes traceless octopoles.";
              throw OpenMMException(buffer.str());
        }
 
-       if (fabs(molecularQuadrupole[5] - molecularQuadrupole[7]) > quadrupoleValidationTolerance ) {
+       trace = fabs(molecularOctopole[4] + molecularOctopole[6] + molecularOctopole[9]);
+       if (trace > octopoleValidationTolerance) {
              std::stringstream buffer;
-             buffer << "MPIDForce: YZ and ZY components of quadrupole for particle=" << ii;
-             buffer << "  are not equal: [" << molecularQuadrupole[5] << " " << molecularQuadrupole[7] << "];";
-             buffer << " MPID plugin assumes symmetric quadrupole tensor.";
+             buffer << "MPIDForce: (ZXX,ZYY,ZZZ) octopole for particle=" << ii;
+             buffer << " has nonzero trace: " << trace << "; MPID plugin assumes traceless octopoles.";
              throw OpenMMException(buffer.str());
        }
 
-       // TODO: ACS: add sanity checks for octopoles
 
        // only 'Z-then-X', 'Bisector', Z-Bisect, ThreeFold  currently handled
 

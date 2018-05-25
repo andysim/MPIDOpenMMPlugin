@@ -232,9 +232,9 @@ public:
      * Add multipole-related info for a particle
      *
      * @param charge               the particle's charge
-     * @param molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param molecularQuadrupole  the particle's molecular quadrupole (vector of size 9)
-     * @param molecularOctopole    the particle's molecular octopole (vector of size 27)
+     * @param molecularDipole      the particle's molecular dipole (vector containing X Y Z )
+     * @param molecularQuadrupole  the particle's molecular quadrupole (vector containing XX XY YY XZ YZ ZZ)
+     * @param molecularOctopole    the particle's molecular octopole (vector containing XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ)
      * @param axisType             the particle's axis type
      * @param multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
@@ -250,9 +250,9 @@ public:
      *
      * @param index                     the index of the atom for which to get parameters
      * @param[out] charge               the particle's charge
-     * @param[out] molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param[out] molecularQuadrupole  the particle's molecular quadrupole (vector of size 9)
-     * @param[out] molecularOctopole    the particle's molecular octopole (vector of size 27)
+     * @param[out] molecularDipole      the particle's molecular dipole (vector containing X Y Z )
+     * @param[out] molecularQuadrupole  the particle's molecular quadrupole (vector containing XX XY YY XZ YZ ZZ)
+     * @param[out] molecularOctopole    the particle's molecular octopole (vector containing XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ)
      * @param[out] axisType             the particle's axis type
      * @param[out] multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param[out] multipoleAtomX       index of second atom used in constructing lab<->molecular frames
@@ -268,9 +268,9 @@ public:
      *
      * @param index                the index of the atom for which to set parameters
      * @param charge               the particle's charge
-     * @param molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param molecularQuadrupole  the particle's molecular quadrupole (vector of size 9)
-     * @param molecularOctopole    the particle's molecular octopole (vector of size 27)
+     * @param molecularDipole      the particle's molecular dipole (vector containing X Y Z )
+     * @param molecularQuadrupole  the particle's molecular quadrupole (vector containing XX XY YY XZ YZ ZZ)
+     * @param molecularOctopole    the particle's molecular octopole (vector containing XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ)
      * @param axisType             the particle's axis type
      * @param multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
@@ -483,9 +483,9 @@ public:
     double charge, thole, dampingFactor;
     Vec3 polarity;
 
-    std::vector<double> molecularDipole;
-    std::vector<double> molecularQuadrupole;
-    std::vector<double> molecularOctopole;
+    std::vector<double> molecularDipole;      // Ordered as X Y Z
+    std::vector<double> molecularQuadrupole;  // Ordered as XX  XY  YY  XZ  YZ  ZZ
+    std::vector<double> molecularOctopole;    // Ordered as XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ
     std::vector< std::vector<int> > covalentInfo;
 
     MultipoleInfo() {
@@ -493,8 +493,8 @@ public:
         charge   = thole          = dampingFactor  = 0.0;
 
         molecularDipole.resize(3);
-        molecularQuadrupole.resize(9);
-        molecularOctopole.resize(27);
+        molecularQuadrupole.resize(6);
+        molecularOctopole.resize(10);
 
     }
 
@@ -506,24 +506,11 @@ public:
        covalentInfo.resize(CovalentEnd);
 
        molecularDipole.resize(3);
-       molecularDipole[0]          = inputMolecularDipole[0];
-       molecularDipole[1]          = inputMolecularDipole[1];
-       molecularDipole[2]          = inputMolecularDipole[2];
-
-       molecularQuadrupole.resize(9);
-       molecularQuadrupole[0]      = inputMolecularQuadrupole[0];
-       molecularQuadrupole[1]      = inputMolecularQuadrupole[1];
-       molecularQuadrupole[2]      = inputMolecularQuadrupole[2];
-       molecularQuadrupole[3]      = inputMolecularQuadrupole[3];
-       molecularQuadrupole[4]      = inputMolecularQuadrupole[4];
-       molecularQuadrupole[5]      = inputMolecularQuadrupole[5];
-       molecularQuadrupole[6]      = inputMolecularQuadrupole[6];
-       molecularQuadrupole[7]      = inputMolecularQuadrupole[7];
-       molecularQuadrupole[8]      = inputMolecularQuadrupole[8];
-
-       molecularOctopole.resize(27);
-       for(int i = 0; i < 27; ++i)
-           molecularOctopole[i] = inputMolecularOctopole[i];
+       molecularQuadrupole.resize(6);
+       molecularOctopole.resize(10);
+       for(int i = 0; i < 3; ++i) molecularDipole[i] = inputMolecularDipole[i];
+       for(int i = 0; i < 6; ++i) molecularQuadrupole[i] = inputMolecularQuadrupole[i];
+       for(int i = 0; i < 10; ++i) molecularOctopole[i] = inputMolecularOctopole[i];
 
        dampingFactor = pow((alphas[0]+alphas[1]+alphas[2])/3.0, 1.0/6.0);
     }

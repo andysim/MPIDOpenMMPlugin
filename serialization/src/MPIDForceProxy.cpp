@@ -116,23 +116,29 @@ void MPIDForceProxy::serialize(const void* object, SerializationNode& node) cons
         particle.setDoubleProperty("charge", charge).setDoubleProperty("thole", thole).setDoubleProperty("damp", dampingFactor).setDoubleProperty("alphaxx", alphas[0]).setDoubleProperty("alphayy", alphas[1]).setDoubleProperty("alphazz", alphas[2]);
 
         SerializationNode& dipole      = particle.createChildNode("Dipole");
-        dipole.setDoubleProperty("d0", molecularDipole[0]).setDoubleProperty("d1", molecularDipole[1]).setDoubleProperty("d2", molecularDipole[2]);
+        dipole.setDoubleProperty("dX", molecularDipole[0]);
+        dipole.setDoubleProperty("dY", molecularDipole[1]);
+        dipole.setDoubleProperty("dZ", molecularDipole[2]);
 
         SerializationNode& quadrupole  = particle.createChildNode("Quadrupole");
-        quadrupole.setDoubleProperty("q0", molecularQuadrupole[0]).setDoubleProperty("q1", molecularQuadrupole[1]).setDoubleProperty("q2", molecularQuadrupole[2]);
-        quadrupole.setDoubleProperty("q3", molecularQuadrupole[3]).setDoubleProperty("q4", molecularQuadrupole[4]).setDoubleProperty("q5", molecularQuadrupole[5]);
-        quadrupole.setDoubleProperty("q6", molecularQuadrupole[6]).setDoubleProperty("q7", molecularQuadrupole[7]).setDoubleProperty("q8", molecularQuadrupole[8]);
+        quadrupole.setDoubleProperty("qXX", molecularQuadrupole[0]);
+        quadrupole.setDoubleProperty("qXY", molecularQuadrupole[1]);
+        quadrupole.setDoubleProperty("qYY", molecularQuadrupole[2]);
+        quadrupole.setDoubleProperty("qXZ", molecularQuadrupole[3]);
+        quadrupole.setDoubleProperty("qYZ", molecularQuadrupole[4]);
+        quadrupole.setDoubleProperty("qZZ", molecularQuadrupole[5]);
 
         SerializationNode& octopole  = particle.createChildNode("Octopole");
-        octopole.setDoubleProperty("o0", molecularOctopole[0]).setDoubleProperty("o1", molecularOctopole[1]).setDoubleProperty("o2", molecularOctopole[2]);
-        octopole.setDoubleProperty("o3", molecularOctopole[3]).setDoubleProperty("o4", molecularOctopole[4]).setDoubleProperty("o5", molecularOctopole[5]);
-        octopole.setDoubleProperty("o6", molecularOctopole[6]).setDoubleProperty("o7", molecularOctopole[7]).setDoubleProperty("o8", molecularOctopole[8]);
-        octopole.setDoubleProperty("o9", molecularOctopole[9]).setDoubleProperty("o10", molecularOctopole[10]).setDoubleProperty("o11", molecularOctopole[11]);
-        octopole.setDoubleProperty("o12", molecularOctopole[12]).setDoubleProperty("o13", molecularOctopole[13]).setDoubleProperty("o14", molecularOctopole[14]);
-        octopole.setDoubleProperty("o15", molecularOctopole[15]).setDoubleProperty("o16", molecularOctopole[16]).setDoubleProperty("o17", molecularOctopole[17]);
-        octopole.setDoubleProperty("o18", molecularOctopole[18]).setDoubleProperty("o19", molecularOctopole[19]).setDoubleProperty("o20", molecularOctopole[20]);
-        octopole.setDoubleProperty("o21", molecularOctopole[21]).setDoubleProperty("o22", molecularOctopole[22]).setDoubleProperty("o23", molecularOctopole[23]);
-        octopole.setDoubleProperty("o24", molecularOctopole[24]).setDoubleProperty("o25", molecularOctopole[25]).setDoubleProperty("o26", molecularOctopole[26]);
+        octopole.setDoubleProperty("oXXX", molecularOctopole[0]);
+        octopole.setDoubleProperty("oXXY", molecularOctopole[1]);
+        octopole.setDoubleProperty("oXYY", molecularOctopole[2]);
+        octopole.setDoubleProperty("oYYY", molecularOctopole[3]);
+        octopole.setDoubleProperty("oXXZ", molecularOctopole[4]);
+        octopole.setDoubleProperty("oXYZ", molecularOctopole[5]);
+        octopole.setDoubleProperty("oYYZ", molecularOctopole[6]);
+        octopole.setDoubleProperty("oXZZ", molecularOctopole[7]);
+        octopole.setDoubleProperty("oYZZ", molecularOctopole[8]);
+        octopole.setDoubleProperty("oZZZ", molecularOctopole[9]);
 
         for (unsigned int jj = 0; jj < covalentTypes.size(); jj++) {
             std::vector< int > covalentMap;
@@ -181,51 +187,31 @@ void* MPIDForceProxy::deserialize(const SerializationNode& node) const {
 
             std::vector<double> molecularDipole;
             const SerializationNode& dipole = particle.getChildNode("Dipole");
-            molecularDipole.push_back(dipole.getDoubleProperty("d0"));
-            molecularDipole.push_back(dipole.getDoubleProperty("d1"));
-            molecularDipole.push_back(dipole.getDoubleProperty("d2"));
+            molecularDipole.push_back(dipole.getDoubleProperty("dX"));
+            molecularDipole.push_back(dipole.getDoubleProperty("dY"));
+            molecularDipole.push_back(dipole.getDoubleProperty("dZ"));
 
             std::vector<double> molecularQuadrupole;
             const SerializationNode& quadrupole = particle.getChildNode("Quadrupole");
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q0"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q1"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q2"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q3"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q4"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q5"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q6"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q7"));
-            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("q8"));
+            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("qXX"));
+            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("qXY"));
+            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("qYY"));
+            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("qXZ"));
+            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("qYZ"));
+            molecularQuadrupole.push_back(quadrupole.getDoubleProperty("qZZ"));
 
             std::vector<double> molecularOctopole;
             const SerializationNode& octopole = particle.getChildNode("Octopole");
-            molecularOctopole.push_back(octopole.getDoubleProperty("o0"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o1"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o2"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o3"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o4"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o5"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o6"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o7"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o8"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o9"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o10"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o11"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o12"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o13"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o14"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o15"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o16"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o17"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o18"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o19"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o20"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o21"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o22"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o23"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o24"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o25"));
-            molecularOctopole.push_back(octopole.getDoubleProperty("o26"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oXXX"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oXXY"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oXYY"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oYYY"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oXXZ"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oXYZ"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oYYZ"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oXZZ"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oYZZ"));
+            molecularOctopole.push_back(octopole.getDoubleProperty("oZZZ"));
             force->addMultipole(particle.getDoubleProperty("charge"), molecularDipole, molecularQuadrupole, molecularOctopole,
                                 particle.getIntProperty("axisType"),
                                 particle.getIntProperty("multipoleAtomZ"),

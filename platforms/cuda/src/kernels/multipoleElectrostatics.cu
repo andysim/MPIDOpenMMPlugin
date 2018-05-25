@@ -108,9 +108,10 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
 
     real dmp = std::abs(atom1.damp*atom2.damp);
     real a = pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
-    real u = dmp > (real)1.0E-5 ? r/dmp : (real)1E10;
+    real u = dmp > (real)1.0E-5 ? r/dmp : (real)1E6;
     real au = a*u;
     real expau = au < (real)50 ? exp(-au) : (real)0;
+    au =  dmp > (real)1.0E-5 ? au : 0;
     real au2 = au*au;
     real au3 = au2*au;
     real au4 = au3*au;
@@ -463,7 +464,6 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
              + rotatedOctopole2[0]*VjiR[9] + rotatedOctopole2[1]*VjiR[10] + rotatedOctopole2[2]*VjiR[11] + rotatedOctopole2[3]*VjiR[12]
              + rotatedOctopole2[4]*VjiR[13] + rotatedOctopole2[5]*VjiR[14] + rotatedOctopole2[6]*VjiR[15]
              ;
-
     const real sqrtThreeHalves = SQRT((real)1.5f);
     const real sqrtFiveHalves = SQRT((real)2.5f);
     real EIX = 0 
