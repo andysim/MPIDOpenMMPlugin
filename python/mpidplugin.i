@@ -235,9 +235,9 @@ public:
      * Add multipole-related info for a particle
      *
      * @param charge               the particle's charge
-     * @param molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param molecularQuadrupole  the particle's molecular quadrupole (vector of size 9)
-     * @param molecularOctopole    the particle's molecular octopole (vector of size 27)
+     * @param molecularDipole      the particle's molecular dipole (vector containing X Y Z )
+     * @param molecularQuadrupole  the particle's molecular quadrupole (vector containing XX XY YY XZ YZ ZZ)
+     * @param molecularOctopole    the particle's molecular octopole (vector containing XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ)
      * @param axisType             the particle's axis type
      * @param multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
@@ -246,22 +246,22 @@ public:
      * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     int addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
-                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
+                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const OpenMM::Vec3& alphas);
 
     /**
      * Get the multipole parameters for a particle.
      *
      * @param index                     the index of the atom for which to get parameters
      * @param[out] charge               the particle's charge
-     * @param[out] molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param[out] molecularQuadrupole  the particle's molecular quadrupole (vector of size 9)
-     * @param[out] molecularOctopole    the particle's molecular octopole (vector of size 27)
+     * @param[out] molecularDipole      the particle's molecular dipole (vector containing X Y Z )
+     * @param[out] molecularQuadrupole  the particle's molecular quadrupole (vector containing XX XY YY XZ YZ ZZ)
+     * @param[out] molecularOctopole    the particle's molecular octopole (vector containing XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ)
      * @param[out] axisType             the particle's axis type
      * @param[out] multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param[out] multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param[out] multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param[out] thole                Thole parameter
-     * @param[out] alphas		   	    A 3-vector containing the xx, yy and zz polarizabilities
+     * @param[out] alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     %apply double& OUTPUT {double& charge};
     %apply std::vector<double>& OUTPUT {std::vector<double>& molecularDipole};
@@ -272,9 +272,9 @@ public:
     %apply int& OUTPUT {int& multipoleAtomX};
     %apply int& OUTPUT {int& multipoleAtomY};
     %apply double& OUTPUT {double& thole};
-    %apply Vec3& OUTPUT {double& alphas};
+    %apply OpenMM::Vec3& OUTPUT {double& alphas};
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double>& molecularOctopole,
-                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, Vec3& alphas) const;
+                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, OpenMM::Vec3& alphas) const;
     %clear double& charge;
     %clear std::vector<double>& molecularDipole;
     %clear std::vector<double>& molecularQuadrupole;
@@ -284,25 +284,25 @@ public:
     %clear int& multipoleAtomX;
     %clear int& multipoleAtomY;
     %clear double& thole;
-    %clear Vec3& alphas;
+    %clear OpenMM::Vec3& alphas;
 
     /**
      * Set the multipole parameters for a particle.
      *
      * @param index                the index of the atom for which to set parameters
      * @param charge               the particle's charge
-     * @param molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param molecularQuadrupole  the particle's molecular quadrupole (vector of size 9)
-     * @param molecularOctopole    the particle's molecular octopole (vector of size 27)
+     * @param molecularDipole      the particle's molecular dipole (vector containing X Y Z )
+     * @param molecularQuadrupole  the particle's molecular quadrupole (vector containing XX XY YY XZ YZ ZZ)
+     * @param molecularOctopole    the particle's molecular octopole (vector containing XXX XXY XYY YYY XXZ XYZ YYZ XZZ YZZ ZZZ)
      * @param axisType             the particle's axis type
      * @param multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
      * @param thole                thole parameter
-     * @param alphas			   A 3-vector containing the xx, yy and zz polarizabilities
+     * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     void setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double> &molecularOctopole,
-                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
+                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const OpenMM::Vec3& alphas);
 
     /**
      * Set the CovalentMap for an atom
@@ -482,7 +482,7 @@ public:
     /**
      * Set the default Thole width (in nm) used for "direct" pairs.
      */
-    void setDefaultTholeWidth();
+    void setDefaultTholeWidth(double val);
 
     /**
      * Get the default Thole width (in nm) used for "direct" pairs.
