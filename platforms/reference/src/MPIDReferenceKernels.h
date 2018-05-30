@@ -139,7 +139,7 @@ private:
     std::vector<double> octopoles;
     std::vector<double> tholes;
     std::vector<double> dampingFactors;
-    std::vector<Vec3>   polarity;
+    std::vector<std::vector<double> >   polarity;
     std::vector<int>   axisTypes;
     std::vector<int>   multipoleAtomZs;
     std::vector<int>   multipoleAtomXs;

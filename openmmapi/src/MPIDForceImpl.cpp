@@ -75,7 +75,7 @@ void MPIDForceImpl::initialize(ContextImpl& context) {
         std::vector<double> molecularDipole;
         std::vector<double> molecularQuadrupole;
         std::vector<double> molecularOctopole;
-        Vec3 alphas;
+        std::vector<double> alphas;
 
         owner.getMultipoleParameters(ii, charge, molecularDipole, molecularQuadrupole, molecularOctopole, axisType,
                                      multipoleAtomZ, multipoleAtomX, multipoleAtomY,

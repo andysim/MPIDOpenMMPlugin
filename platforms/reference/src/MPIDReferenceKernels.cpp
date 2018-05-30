@@ -108,7 +108,7 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
 
         int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
         double charge, tholeD;
-        Vec3 alphasD;
+        std::vector<double> alphasD;
         std::vector<double> dipolesD;
         std::vector<double> quadrupolesD;
         std::vector<double> octopolesD;
@@ -354,7 +354,7 @@ void ReferenceCalcMPIDForceKernel::copyParametersToContext(ContextImpl& context,
         std::vector<double> dipolesD;
         std::vector<double> quadrupolesD;
         std::vector<double> octopolesD;
-        Vec3 polarityD;
+        std::vector<double> polarityD;
         force.getMultipoleParameters(i, charge, dipolesD, quadrupolesD, octopolesD, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, tholeD, polarityD);
         dampingFactorD = pow((polarityD[0]+polarityD[1]+polarityD[2])/3.0, 1.0/6.0);
         axisTypes[i] = axisType;

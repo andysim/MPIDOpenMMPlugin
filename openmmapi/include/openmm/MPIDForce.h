@@ -243,7 +243,7 @@ public:
      * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     int addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
-                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
+                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const std::vector<double>& alphas);
 
     /**
      * Get the multipole parameters for a particle.
@@ -261,7 +261,7 @@ public:
      * @param[out] alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double>& molecularOctopole,
-                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, Vec3& alphas) const;
+                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, std::vector<double> &alphas) const;
 
     /**
      * Set the multipole parameters for a particle.
@@ -279,7 +279,7 @@ public:
      * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     void setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double> &molecularOctopole,
-                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas);
+                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const std::vector<double>& alphas);
 
     /**
      * Set the CovalentMap for an atom
@@ -481,7 +481,7 @@ public:
 
     int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
     double charge, thole, dampingFactor;
-    Vec3 polarity;
+    std::vector<double> polarity;
 
     std::vector<double> molecularDipole;      // Ordered as X Y Z
     std::vector<double> molecularQuadrupole;  // Ordered as XX  XY  YY  XZ  YZ  ZZ
@@ -499,7 +499,7 @@ public:
     }
 
     MultipoleInfo(double charge, const std::vector<double>& inputMolecularDipole, const std::vector<double>& inputMolecularQuadrupole, const std::vector<double>& inputMolecularOctopole,
-                   int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas) :
+                   int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const std::vector<double>& alphas) :
         axisType(axisType), multipoleAtomZ(multipoleAtomZ), multipoleAtomX(multipoleAtomX), multipoleAtomY(multipoleAtomY),
         charge(charge), thole(thole), polarity(alphas) {
 

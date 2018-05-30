@@ -107,13 +107,13 @@ void MPIDForceProxy::serialize(const void* object, SerializationNode& node) cons
         std::vector<double> molecularDipole;
         std::vector<double> molecularQuadrupole;
         std::vector<double> molecularOctopole;
-        Vec3 alphas;
+        std::vector<double> alphas;
         force.getMultipoleParameters(ii, charge, molecularDipole, molecularQuadrupole, molecularOctopole,
                                      axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, thole, alphas);
 
         SerializationNode& particle    = particles.createChildNode("Particle");
         particle.setIntProperty("axisType", axisType).setIntProperty("multipoleAtomZ", multipoleAtomZ).setIntProperty("multipoleAtomX", multipoleAtomX).setIntProperty("multipoleAtomY", multipoleAtomY);
-        particle.setDoubleProperty("charge", charge).setDoubleProperty("thole", thole).setDoubleProperty("damp", dampingFactor).setDoubleProperty("alphaxx", alphas[0]).setDoubleProperty("alphayy", alphas[1]).setDoubleProperty("alphazz", alphas[2]);
+        particle.setDoubleProperty("charge", charge).setDoubleProperty("thole", thole).setDoubleProperty("damp", dampingFactor).setDoubleProperty("polarizabilityXX", alphas[0]).setDoubleProperty("polarizabilityYY", alphas[1]).setDoubleProperty("polarizabilityZZ", alphas[2]);
 
         SerializationNode& dipole      = particle.createChildNode("Dipole");
         dipole.setDoubleProperty("dX", molecularDipole[0]);
@@ -212,13 +212,17 @@ void* MPIDForceProxy::deserialize(const SerializationNode& node) const {
             molecularOctopole.push_back(octopole.getDoubleProperty("oXZZ"));
             molecularOctopole.push_back(octopole.getDoubleProperty("oYZZ"));
             molecularOctopole.push_back(octopole.getDoubleProperty("oZZZ"));
+            std::vector<double> polarizability;
+            polarizability.push_back(particle.getDoubleProperty("polarizabilityXX"));
+            polarizability.push_back(particle.getDoubleProperty("polarizabilityYY"));
+            polarizability.push_back(particle.getDoubleProperty("polarizabilityZZ"));
             force->addMultipole(particle.getDoubleProperty("charge"), molecularDipole, molecularQuadrupole, molecularOctopole,
                                 particle.getIntProperty("axisType"),
                                 particle.getIntProperty("multipoleAtomZ"),
                                 particle.getIntProperty("multipoleAtomX"),
                                 particle.getIntProperty("multipoleAtomY"),
                                 particle.getDoubleProperty("thole"),
-                                Vec3(particle.getDoubleProperty("alphaxx"), particle.getDoubleProperty("alphayy"), particle.getDoubleProperty("alphazz")));
+                                polarizability);
 
             // covalent maps 
 

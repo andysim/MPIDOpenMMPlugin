@@ -246,7 +246,7 @@ public:
      * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     int addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
-                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const OpenMM::Vec3& alphas);
+                     int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const std::vector<double>& alphas);
 
     /**
      * Get the multipole parameters for a particle.
@@ -272,9 +272,9 @@ public:
     %apply int& OUTPUT {int& multipoleAtomX};
     %apply int& OUTPUT {int& multipoleAtomY};
     %apply double& OUTPUT {double& thole};
-    %apply OpenMM::Vec3& OUTPUT {double& alphas};
+    %apply std::vector<double>& OUTPUT {double& alphas};
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double>& molecularOctopole,
-                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, OpenMM::Vec3& alphas) const;
+                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, std::vector<double>& alphas) const;
     %clear double& charge;
     %clear std::vector<double>& molecularDipole;
     %clear std::vector<double>& molecularQuadrupole;
@@ -284,7 +284,7 @@ public:
     %clear int& multipoleAtomX;
     %clear int& multipoleAtomY;
     %clear double& thole;
-    %clear OpenMM::Vec3& alphas;
+    %clear std::vector<double>& alphas;
 
     /**
      * Set the multipole parameters for a particle.
@@ -302,7 +302,7 @@ public:
      * @param alphas               A 3-vector containing the xx, yy and zz polarizabilities
      */
     void setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double> &molecularOctopole,
-                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const OpenMM::Vec3& alphas);
+                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const std::vector<double>& alphas);
 
     /**
      * Set the CovalentMap for an atom

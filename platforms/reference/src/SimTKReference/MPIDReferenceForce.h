@@ -597,7 +597,7 @@ public:
                                    const std::vector<double> &octopoles,
                                    const std::vector<double>& tholes,
                                    const std::vector<double>& dampingFactors,
-                                   const vector<Vec3> &polarity,
+                                   const vector<std::vector<double> > &polarity,
                                    const std::vector<int>& axisTypes,
                                    const std::vector<int>& multipoleAtomZs,
                                    const std::vector<int>& multipoleAtomXs,
@@ -631,7 +631,7 @@ public:
                                  const std::vector<double>& octopoles,
                                  const std::vector<double>& tholes,
                                  const std::vector<double>& dampingFactors,
-                                 const std::vector<Vec3>& polarity,
+                                 const std::vector<std::vector<double> >& polarity,
                                  const std::vector<int>& axisTypes,
                                  const std::vector<int>& multipoleAtomZs,
                                  const std::vector<int>& multipoleAtomXs,
@@ -666,7 +666,7 @@ public:
                                            const std::vector<double>& octopoles,
                                            const std::vector<double>& tholes,
                                            const std::vector<double>& dampingFactors,
-                                           const vector<Vec3> &polarity,
+                                           const vector<std::vector<double> > &polarity,
                                            const std::vector<int>& axisTypes,
                                            const std::vector<int>& multipoleAtomZs,
                                            const std::vector<int>& multipoleAtomXs,
@@ -702,7 +702,7 @@ public:
                                const std::vector<double>& octopoles,
                                const std::vector<double>& tholes,
                                const std::vector<double>& dampingFactors,
-                               const vector<Vec3> &polarity,
+                               const vector<std::vector<double> > &polarity,
                                const std::vector<int>& axisTypes,
                                const std::vector<int>& multipoleAtomZs,
                                const std::vector<int>& multipoleAtomXs,
@@ -739,7 +739,7 @@ public:
                                                const std::vector<double>& octopoles,
                                                const std::vector<double>& tholes,
                                                const std::vector<double>& dampingFactors,
-                                               const std::vector<Vec3>& polarity,
+                                               const std::vector<std::vector<double> >& polarity,
                                                const std::vector<int>& axisTypes,
                                                const std::vector<int>& multipoleAtomZs,
                                                const std::vector<int>& multipoleAtomXs,
@@ -773,7 +773,7 @@ public:
                                          const std::vector<double>& octopoles,
                                          const std::vector<double>& tholes,
                                          const std::vector<double>& dampingFactors,
-                                         const std::vector<Vec3>& polarity,
+                                         const std::vector<std::vector<double> >& polarity,
                                          const std::vector<int>& axisTypes,
                                          const std::vector<int>& multipoleAtomZs,
                                          const std::vector<int>& multipoleAtomXs,
@@ -807,7 +807,7 @@ protected:
             double sphericalOctopole[7];
             double thole;
             double dampingFactor;
-            Vec3 polarity;
+            std::vector<double> polarity;
             double labPolarization[6];
             bool isAnisotropic;
     };
@@ -897,7 +897,7 @@ protected:
                           const std::vector<double>& octopoles,
                           const std::vector<double>& tholes,
                           const std::vector<double>& dampingFactors,
-                          const vector<Vec3> &polarity,
+                          const vector<std::vector<double> > &polarity,
                           std::vector<MultipoleParticleData>& particleData) const;
 
     /**
@@ -1233,7 +1233,7 @@ protected:
                const std::vector<double>& octopoles,
                const std::vector<double>& tholes,
                const std::vector<double>& dampingFactors,
-               const std::vector<Vec3>& polarity,
+               const std::vector<std::vector<double> >& polarity,
                const std::vector<int>& axisTypes,
                const std::vector<int>& multipoleAtomZs,
                const std::vector<int>& multipoleAtomXs,

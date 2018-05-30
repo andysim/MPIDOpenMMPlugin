@@ -153,13 +153,13 @@ void MPIDForce::setEwaldErrorTolerance(double tol) {
 
 int MPIDForce::addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole,
                                        const std::vector<double>& molecularOctopole, int axisType, int multipoleAtomZ, int multipoleAtomX,
-                                       int multipoleAtomY, double thole, const Vec3& alphas) {
+                                       int multipoleAtomY, double thole, const std::vector<double>& alphas) {
     multipoles.push_back(MultipoleInfo(charge, molecularDipole, molecularQuadrupole,  molecularOctopole, axisType, multipoleAtomZ,  multipoleAtomX, multipoleAtomY, thole, alphas));
     return multipoles.size()-1;
 }
 
 void MPIDForce::getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double> &molecularOctopole,
-                                                  int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, Vec3& alphas) const {
+                                                  int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, std::vector<double>& alphas) const {
     charge                      = multipoles[index].charge;
 
     molecularDipole.resize(3);
@@ -175,11 +175,12 @@ void MPIDForce::getMultipoleParameters(int index, double& charge, std::vector<do
     multipoleAtomY              = multipoles[index].multipoleAtomY;
 
     thole                       = multipoles[index].thole;
-    alphas                      = multipoles[index].polarity;
+    alphas.resize(3);
+    for(int i = 0; i < 3; ++i) molecularDipole[i] = multipoles[index].polarity[i];
 }
 
 void MPIDForce::setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
-                                                  int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const Vec3& alphas) {
+                                                  int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, const std::vector<double>& alphas) {
 
     multipoles[index].charge                      = charge;
 
@@ -195,6 +196,7 @@ void MPIDForce::setMultipoleParameters(int index, double charge, const std::vect
     multipoles[index].thole                       = thole;
     multipoles[index].dampingFactor               = dampingFactor;
     multipoles[index].polarity                    = alphas;
+    for(int i = 0; i < 3; ++i) multipoles[index].polarity[i] = alphas[i];
 
 }
 

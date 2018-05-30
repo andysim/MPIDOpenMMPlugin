@@ -65,7 +65,7 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
                    bool do_charge = true, bool do_dpole = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
 {
     std::map < std::string, double > tholemap;
-    std::map < std::string, Vec3 > polarmap;
+    std::map < std::string, std::vector<double>> polarmap;
     std::map < std::string, double > chargemap;
     std::map < std::string, std::vector<double> > dipolemap;
     std::map < std::string, std::vector<double> > quadrupolemap;
@@ -138,9 +138,9 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
     octopolemap["H1"] = hov;
     octopolemap["H2"] = hov;
 
-    polarmap["O"]  = Vec3(0.000837, 0.000837, 0.000837);
-    polarmap["H1"] = Vec3(0.000496, 0.000496, 0.000496);
-    polarmap["H2"] = Vec3(0.000496, 0.000496, 0.000496);
+    polarmap["O"]  = std::vector<double>{0.000837, 0.000837, 0.000837};
+    polarmap["H1"] = std::vector<double>{0.000496, 0.000496, 0.000496};
+    polarmap["H2"] = std::vector<double>{0.000496, 0.000496, 0.000496};
 
     tholemap["O"]  = 0.3900;
     tholemap["H1"] = 0.3900;
@@ -581,8 +581,8 @@ void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vec
     const char* atom_types[3] = {"O", "H1", "H2"};
     for(int atom = 0; atom < natoms; ++atom){
         const char* element = atom_types[atom%3];
-        Vec3 alpha = polarmap[element];
-        if(!do_pol) alpha = Vec3();
+        std::vector<double> &alpha = polarmap[element];
+        if(!do_pol) alpha = std::vector<double> {0, 0, 0};
         int atomz = atom + anchormap[element][0];
         int atomx = atom + anchormap[element][1];
         int atomy = anchormap[element][2]==0 ? -1 : atom + anchormap[element][2];
@@ -618,7 +618,7 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
                       bool do_charge = true, bool do_dpole  = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
 {
     std::map < std::string, double > tholemap;
-    std::map < std::string, Vec3 > polarmap;
+    std::map < std::string, std::vector<double>> polarmap;
     std::map < std::string, double > chargemap;
     std::map < std::string, std::vector<double> > dipolemap;
     std::map < std::string, std::vector<double> > quadrupolemap;
@@ -727,9 +727,9 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
     octopolemap["H1B"] = zeroov;
     octopolemap["H1C"] = zeroov;
 
-    Vec3 c1pol(0.00100000, 0.00100000, 0.00100000);
-    Vec3 o1pol(0.00100024, 0.00125025, 0.00083350);
-    Vec3 zeropol(0.0, 0.0, 0.0);
+    std::vector<double> c1pol{0.00100000, 0.00100000, 0.00100000};
+    std::vector<double> o1pol{0.00100024, 0.00125025, 0.00083350};
+    std::vector<double> zeropol{0.0, 0.0, 0.0};
     polarmap["C1"]  = c1pol;
     polarmap["O1"]  = o1pol;
     polarmap["HO1"] = zeropol;
@@ -809,8 +809,8 @@ void make_methanolbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  
 
     for(int atom = 0; atom < natoms; ++atom){
         const char* element = atom_types[atom%6];
-        Vec3 alphas = polarmap[element];
-        if(!do_pol) alphas = Vec3();
+        std::vector<double> alphas = polarmap[element];
+        if(!do_pol) alphas = std::vector<double>{0, 0, 0};
         int atomz = atom + anchormap[element][0];
         int atomx = anchormap[element][1]==0 ? -1 : atom + anchormap[element][1];
         int atomy = anchormap[element][2]==0 ? -1 : atom + anchormap[element][2];

@@ -89,6 +89,7 @@ void testSerialization() {
         std::vector<double> molecularDipole;
         std::vector<double> molecularQuadrupole;
         std::vector<double> molecularOctopole;
+        std::vector<double> polarizability;
         molecularDipole.push_back(0.1); molecularDipole.push_back(rand()); molecularDipole.push_back(rand());
         for (unsigned int jj = 0; jj < 6; jj++) {
             molecularQuadrupole.push_back(static_cast<double>(rand()));
@@ -96,8 +97,11 @@ void testSerialization() {
         for (unsigned int jj = 0; jj < 10; jj++) {
             molecularOctopole.push_back(static_cast<double>(rand()));
         }
+        for (unsigned int jj = 0; jj < 3; jj++) {
+            polarizability.push_back(static_cast<double>(rand()));
+        }
         force1.addMultipole(static_cast<double>(ii+1), molecularDipole, molecularQuadrupole, molecularOctopole, MPIDForce::Bisector,
-                            ii+1, ii+2, ii+3, static_cast<double>(rand()), Vec3(static_cast<double>(rand()), static_cast<double>(rand()), static_cast<double>(rand())));
+                            ii+1, ii+2, ii+3, static_cast<double>(rand()), polarizability);
 
         for (unsigned int jj = 0; jj < covalentTypes.size(); jj++) {
             std::vector< int > covalentMap;
@@ -148,12 +152,12 @@ void testSerialization() {
         std::vector<double> molecularDipole1;
         std::vector<double> molecularQuadrupole1;
         std::vector<double> molecularOctopole1;
-        Vec3 alphas1;
+        std::vector<double> alphas1;
 
         std::vector<double> molecularDipole2;
         std::vector<double> molecularQuadrupole2;
         std::vector<double> molecularOctopole2;
-        Vec3 alphas2;
+        std::vector<double> alphas2;
 
         force1.getMultipoleParameters(ii, charge1, molecularDipole1, molecularQuadrupole1, molecularOctopole1, axisType1, multipoleAtomZ1, multipoleAtomX1, multipoleAtomY1,
                                        thole1, alphas1);
@@ -167,7 +171,9 @@ void testSerialization() {
         ASSERT_EQUAL(multipoleAtomX1,                multipoleAtomX2);
         ASSERT_EQUAL(multipoleAtomY1,                multipoleAtomY2);
         ASSERT_EQUAL(thole1,                         thole2);
-        ASSERT_EQUAL(alphas1,                        alphas2);
+        for (unsigned int jj = 0; jj < alphas1.size(); jj++) {
+            ASSERT_EQUAL(alphas1[jj],                        alphas2[jj]);
+        }
 
         ASSERT_EQUAL(molecularDipole1.size(), molecularDipole2.size());
         ASSERT_EQUAL(molecularDipole1.size(), 3);
