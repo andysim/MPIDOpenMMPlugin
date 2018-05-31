@@ -1257,7 +1257,6 @@ void testWaterDimerEnergyAndForcesNoCutDirect() {
     // Water box with isotropic induced dipoles
     const double cutoff = 6.0*OpenMM::NmPerAngstrom;
     double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
-    const double alpha = 0.0000001;
     const int grid = 64;
     MPIDForce* forceField = new MPIDForce();
 

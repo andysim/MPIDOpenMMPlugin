@@ -65,8 +65,7 @@ public:
     bool areParticlesIdentical(int particle1, int particle2) {
         double charge1, charge2, thole1, thole2;
         int axis1, axis2, multipole11, multipole12, multipole21, multipole22, multipole31, multipole32;
-        vector<double> dipole1, dipole2, quadrupole1, quadrupole2, octopole1, octopole2;
-        Vec3 polarity1, polarity2;
+        vector<double> dipole1, dipole2, quadrupole1, quadrupole2, octopole1, octopole2, polarity1, polarity2;
         force.getMultipoleParameters(particle1, charge1, dipole1, quadrupole1, octopole1, axis1, multipole11, multipole21, multipole31, thole1, polarity1);
         force.getMultipoleParameters(particle2, charge2, dipole2, quadrupole2, octopole2, axis2, multipole12, multipole22, multipole32, thole2, polarity2);
         if (charge1 != charge2 || thole1 != thole2 || polarity1 != polarity2 || axis1 != axis2) {
@@ -227,8 +226,7 @@ void CudaCalcMPIDForceKernel::initialize(const System& system, const MPIDForce& 
     for (int i = 0; i < numMultipoles; i++) {
         double charge, thole, damping;
         int axisType, atomX, atomY, atomZ;
-        Vec3 polarity;
-        vector<double> dipole, quadrupole, octopole;
+        vector<double> dipole, quadrupole, octopole, polarity;
         force.getMultipoleParameters(i, charge, dipole, quadrupole, octopole, axisType, atomZ, atomX, atomY, thole, polarity);
         if (cu.getUseDoublePrecision())
             posqd[i] = make_double4(0, 0, 0, charge);
@@ -1349,9 +1347,8 @@ void CudaCalcMPIDForceKernel::copyParametersToContext(ContextImpl& context, cons
    
     for (int i = 0; i < force.getNumMultipoles(); i++) {
         double charge, thole, damping;
-        Vec3 polarity;
         int axisType, atomX, atomY, atomZ;
-        vector<double> dipole, quadrupole, octopole;
+        vector<double> dipole, quadrupole, octopole, polarity;
         force.getMultipoleParameters(i, charge, dipole, quadrupole, octopole, axisType, atomZ, atomX, atomY, thole, polarity);
         if (cu.getUseDoublePrecision())
             posqd[i].w = charge;

@@ -176,7 +176,7 @@ void MPIDForce::getMultipoleParameters(int index, double& charge, std::vector<do
 
     thole                       = multipoles[index].thole;
     alphas.resize(3);
-    for(int i = 0; i < 3; ++i) molecularDipole[i] = multipoles[index].polarity[i];
+    for(int i = 0; i < 3; ++i) alphas[i] = multipoles[index].polarity[i];
 }
 
 void MPIDForce::setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole, const std::vector<double>& molecularQuadrupole, const std::vector<double>& molecularOctopole,
