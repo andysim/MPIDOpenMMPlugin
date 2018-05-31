@@ -7,10 +7,16 @@ from sys import stdout, argv
 
 pdb = PDBFile('mpidwater.pdb')
 forcefield = ForceField('mpidwater.xml')
-system = forcefield.createSystem(pdb.topology, constraints=HBonds)
+system = forcefield.createSystem(pdb.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds)
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
 simulation = Simulation(pdb.topology, system, integrator)
 context = simulation.context
+if pdb.topology.getPeriodicBoxVectors():
+    context.setPeriodicBoxVectors(*pdb.topology.getPeriodicBoxVectors())
+
+# Make sure all the forces we expect are present
+for force in range(system.getNumForces()):
+    print(system.getForce(force))
 # Set up platform properties
 platformName = context.getPlatform().getName()
 # Make sure there weren't any issues loading plugins
@@ -29,8 +35,6 @@ else:
     print("Running on the %s platform" % context.getPlatform().getName())
 # Initialize
 context.setPositions(pdb.positions)
-if pdb.topology.getPeriodicBoxVectors():
-    context.setPeriodicBoxVectors(*pdb.topology.getPeriodicBoxVectors())
 
 
 # Dump trajectory info every 1ps
