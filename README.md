@@ -34,11 +34,24 @@ CXXFLAGS="-std=c++11" cmake .. -DCMAKE_INSTALL_PREFIX=$OPENMM_INSTALL_DIR -DPYTH
 make -j 8 
 make PythonInstall
 ```
+For the NIH LoBoS cluster, do this:
+``` bash
+export CUDA_CUDA_LIBRARY=/v/apps/cuda/cuda-7.5.18/lib64/stubs/libcuda.so
+# Specify where to install the mpid version of OpenMM 
+export OPENMM_INSTALL_DIR=/path/to/locatation/where/openmm/and/mpid/plugin/should/live
+# Load the mpid conda environment, which sets the path up correctly
+source activate mpid
+# Call CMake to make sure that it's all
+CXXFLAGS="-std=c++11" cmake .. -DCMAKE_INSTALL_PREFIX=$OPENMM_INSTALL_DIR -DPYTHON_EXECUTABLE=`which python` -DCUDA_CUDA_LIBRARY=$CUDA_CUDA_LIBRARY
+# Run the build (set the number to how every many cores you have)
+make -j 8 
+make PythonInstall
+```
 
 ##### The plugin
 ``` bash
 # Specify where to install the MPID plugin
-CXXFLAGS="-std=c++11" cmake .. -DOPENMM_DIR=$OPENMM_INSTALL_DIR -DCMAKE_INSTALL_PREFIX=$OPENMM_INSTALL_DIR
+CXXFLAGS="-std=c++11" cmake .. -DOPENMM_DIR=$OPENMM_INSTALL_DIR -DCMAKE_INSTALL_PREFIX=$OPENMM_INSTALL_DIR -DCUDA_CUDA_LIBRARY=$CUDA_CUDA_LIBRARY
 make -j 8
 make PythonInstall
 
