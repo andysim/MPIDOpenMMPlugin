@@ -597,27 +597,29 @@ class MPIDGenerator(object):
                 charge = float(atom.attrib['c0'])
 
                 conversion = 1.0
-                dipole = [ conversion*float(atom.attrib['dX']), conversion*float(atom.attrib['dY']), conversion*float(atom.attrib['dZ'])]
+                dipole = [ conversion*float(atom.get(['dX'], 0.0)),
+                           conversion*float(atom.get(['dY'], 0.0)),
+                           conversion*float(atom.get(['dZ'], 0.0)) ]
 
                 quadrupole = []
-                quadrupole.append(conversion*float(atom.attrib['qXX']))
-                quadrupole.append(conversion*float(atom.attrib['qXY']))
-                quadrupole.append(conversion*float(atom.attrib['qYY']))
-                quadrupole.append(conversion*float(atom.attrib['qXZ']))
-                quadrupole.append(conversion*float(atom.attrib['qYZ']))
-                quadrupole.append(conversion*float(atom.attrib['qZZ']))
+                quadrupole.append(conversion*float(atom.get(['qXX'], 0.0)))
+                quadrupole.append(conversion*float(atom.get(['qXY'], 0.0)))
+                quadrupole.append(conversion*float(atom.get(['qYY'], 0.0)))
+                quadrupole.append(conversion*float(atom.get(['qXZ'], 0.0)))
+                quadrupole.append(conversion*float(atom.get(['qYZ'], 0.0)))
+                quadrupole.append(conversion*float(atom.get(['qZZ'], 0.0)))
 
                 octopole = []
-                octopole.append(conversion*float(atom.attrib['oXXX']))
-                octopole.append(conversion*float(atom.attrib['oXXY']))
-                octopole.append(conversion*float(atom.attrib['oXYY']))
-                octopole.append(conversion*float(atom.attrib['oYYY']))
-                octopole.append(conversion*float(atom.attrib['oXXZ']))
-                octopole.append(conversion*float(atom.attrib['oXYZ']))
-                octopole.append(conversion*float(atom.attrib['oYYZ']))
-                octopole.append(conversion*float(atom.attrib['oXZZ']))
-                octopole.append(conversion*float(atom.attrib['oYZZ']))
-                octopole.append(conversion*float(atom.attrib['oZZZ']))
+                octopole.append(conversion*float(atom.get(['oXXX'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oXXY'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oXYY'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oYYY'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oXXZ'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oXYZ'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oYYZ'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oXZZ'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oYZZ'], 0.0)))
+                octopole.append(conversion*float(atom.get(['oZZZ'], 0.0)))
 
                 for t in types[0]:
                     if (t not in generator.typeMap):
@@ -691,14 +693,17 @@ class MPIDGenerator(object):
         if ('ewaldErrorTolerance' in args):
             force.setEwaldErrorTolerance(float(args['ewaldErrorTolerance']))
 
+        force.setPolarizationType(MPIDForce.Extrapolated)
         if ('polarization' in args):
             polarizationType = args['polarization']
             if (polarizationType.lower() == 'direct'):
                 force.setPolarizationType(MPIDForce.Direct)
             elif (polarizationType.lower() == 'mutual'):
                 force.setPolarizationType(MPIDForce.Mutual)
-            else:
+            elif (polarizationType.lower() == 'extrapolated'):
                 force.setPolarizationType(MPIDForce.Extrapolated)
+            else:
+                raise ValueError( "MPIDForce: invalide polarization type: " + polarizationType)
 
         if ('aEwald' in args):
             force.setAEwald(float(args['aEwald']))
