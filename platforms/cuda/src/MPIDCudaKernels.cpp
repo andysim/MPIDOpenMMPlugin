@@ -386,6 +386,7 @@ void CudaCalcMPIDForceKernel::initialize(const System& system, const MPIDForce& 
         inducedField = new CudaArray(cu, 3*paddedNumAtoms, sizeof(long long), "inducedField");
     }
     usePME = (force.getNonbondedMethod() == MPIDForce::PME);
+    std::cout << "USE PME " << usePME << std::endl;
 
     // Create the kernels.
 
