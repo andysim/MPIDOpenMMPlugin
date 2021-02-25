@@ -32,6 +32,7 @@
 #include "openmm/Platform.h"
 #include "openmm/internal/AssertionUtilities.h"
 #include "openmm/MPIDForce.h"
+#include "openmm/OpenMMException.h"
 #include "openmm/serialization/XmlSerializer.h"
 #include <iostream>
 #include <sstream>
