@@ -133,7 +133,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool has
         tmp *= 2*alphaRVec[2];
     }
 
-    real dmp = std::abs(atom1.damp*atom2.damp);
+    real dmp = fabs(atom1.damp*atom2.damp);
     real a = pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
     real u = dmp > (real)1.0E-5 ? r/dmp : (real)1E6;
     real au = a*u;

@@ -17,7 +17,7 @@ inline __device__ void loadAtomData(AtomData& data, int atom, const real4* __res
     data.inducedDipole.y = inducedDipole[atom*3+1];
     data.inducedDipole.z = inducedDipole[atom*3+2];
     float2 temp = dampingAndThole[atom];
-    data.damp = std::abs(temp.x);
+    data.damp = fabs(temp.x);
     data.thole = temp.y;
 }
 
@@ -97,7 +97,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
 
         // compute the error function scaled and unscaled terms
 
-        real damp = std::abs(atom1.damp*atom2.damp);
+        real damp = fabs(atom1.damp*atom2.damp);
         real ratio = damp == 0 ? 0 : (r/damp);
         float pgamma = pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
         damp = pgamma*ratio;
@@ -159,7 +159,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
     real rr3 = -rI*r2I;
     real rr5 = -3*rr3*r2I;
     real rr7 = 5*rr5*r2I;
-    real dampProd = std::abs(atom1.damp*atom2.damp);
+    real dampProd = fabs(atom1.damp*atom2.damp);
     real ratio = (dampProd != 0 ? r/dampProd : 1);
     float pGamma  = pScale == 0.0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH;
     real damp = ratio*pGamma;

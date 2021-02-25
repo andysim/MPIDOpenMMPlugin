@@ -75,7 +75,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
 
         // compute the error function scaled and unscaled terms
 
-        real damp = std::abs(atom1.damp*atom2.damp);
+        real damp = fabs(atom1.damp*atom2.damp);
         real pgamma = (pScale == 0 ? atom1.thole + atom2.thole : DEFAULT_THOLE_WIDTH);
         real dfac = (damp == 0 ? 9999 : pgamma * r / damp); // TODO the inverses should be computed at parse time
         real expdamp = (dfac < 50 ? EXP(-dfac) : 0);
@@ -182,7 +182,7 @@ __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, real3 de
  
     // get scaling factors, if needed
     
-    float damp = std::abs(atom1.damp*atom2.damp);
+    float damp = fabs(atom1.damp*atom2.damp);
     real dampExp;
     if (damp != 0) {
 
