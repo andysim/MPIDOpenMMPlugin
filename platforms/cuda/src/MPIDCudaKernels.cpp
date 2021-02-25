@@ -666,11 +666,11 @@ void CudaCalcMPIDForceKernel::initializeScaleFactors() {
 
     // Figure out the covalent flag values to use for each atom pair.
 
-    vector<ushort2> exclusionTiles;
+    vector<int2> exclusionTiles;
     nb.getExclusionTiles().download(exclusionTiles);
     map<pair<int, int>, int> exclusionTileMap;
     for (int i = 0; i < (int) exclusionTiles.size(); i++) {
-        ushort2 tile = exclusionTiles[i];
+        int2 tile = exclusionTiles[i];
         exclusionTileMap[make_pair(tile.x, tile.y)] = i;
     }
     covalentFlags = CudaArray::create<uint2>(cu, nb.getExclusions().getSize(), "covalentFlags");
