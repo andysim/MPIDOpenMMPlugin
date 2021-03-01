@@ -14,30 +14,30 @@
  </Residue>
  </Residues>
  <HarmonicBondForce>
-  <Bond class1="OW" class2="HW" length="0.09572" k="462750.4"/>
+  <Bond class1="OW" class2="HW" length="0.09572" k="376560"/>
  </HarmonicBondForce>
  <HarmonicAngleForce>
-  <Angle class1="HW" class2="OW" class3="HW" angle="1.82421813418" k="836.8"/>
+  <Angle class1="HW" class2="OW" class3="HW" angle="1.82421813418" k="460.24"/>
  </HarmonicAngleForce>
  <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
-  <Atom type="380" charge="-0.00000001" sigma="0.31507524065751241" epsilon="0.635968"/>
-  <Atom type="381" charge="0.00000001" sigma="1" epsilon="0"/>
+  <Atom type="380" charge="-0.0" sigma="0.31983264" epsilon="0.677808"/>
+  <Atom type="381" charge="0.0" sigma="1" epsilon="0"/>
  </NonbondedForce>
  <MPIDForce>
    <Multipole type="380" kz="-381" kx="-381"
-             c0="-0.51966"
-             dX="0.0" dY="0.0"  dZ="0.00755612136146"
-             qXX="0.000354030721139" qXY="0.0" qYY="-0.000390257077096" qXZ="0.0" qYZ="0.0" qZZ="3.62263559571e-05"
-             oXXY="0.0" oXYY="-6.415084018183151e-08" oYYY="0.0" oXXZ="-1.152422607026746e-06" oXYZ="0.0" oYYZ="-2.558537436767218e-06" oXZZ="3.047102424084479e-07" oYZZ="0.0" oZZZ="3.710960043793964e-06"
+             c0="-1.0614"
+             dX="0.0" dY="0.0"  dZ="-0.023671684"
+             qXX="0.000150963" qXY="0.0" qYY="0.00008707" qXZ="0.0" qYZ="0.0" qZZ="-0.000238034"
+             oXXX="0.0" oXXY="0.0" oXYY="0.0" oYYY="0.0" oXXZ="0.000000426" oXYZ="0.0" oYYZ="0.000000853" oXZZ="0.0" oYZZ="0.0" oZZZ="-0.000001279"
              />
    <Multipole type="381" kz="380" kx="381"
-             c0="0.25983"
-             dX="-0.00204209484795" dY="0.0" dZ="-0.00307875299958"
-             qXX="-3.42848248983e-05" qXY="0.0" qYY="-0.000100240875193" qXZ="-1.89485963908e-06" qYZ="0.0" qZZ="0.000134525700091"
-             oXXX="-2.405600937552608e-07" oXXY="0.0" oXYY="-6.415084018183151e-08" oYYY="0.0" oXXZ="-1.152422607026746e-06" oXYZ="0.0" oYYZ="-2.558537436767218e-06" oXZZ="3.047102424084479e-07" oYZZ="0.0" oZZZ="3.710960043793964e-06"
+             c0="0.5307"
+             dX="0.0" dY="0.0"  dZ="0.0"
+             qXX="0.0" qXY="0.0" qYY="0.0" qXZ="0.0" qYZ="0.0" qZZ="0.0"
+             oXXX="0.0" oXXY="0.0" oXYY="0.0" oYYY="0.0" oXXZ="0.0" oXYZ="0.0" oYYZ="0.0" oXZZ="0.0" oYZZ="0.0" oZZZ="0.0"
              />
-   <Polarize type="380" polarizabilityXX="0.000837" polarizabilityYY="0.000837" polarizabilityZZ="0.000837" thole="0.3900"/>
-   <Polarize type="381" polarizabilityXX="0.000496" polarizabilityYY="0.000496" polarizabilityZZ="0.000496" thole="0.3900"/>
+   <Polarize type="380" polarizabilityXX="0.00088" polarizabilityYY="0.00088" polarizabilityZZ="0.00088" thole="8.0"/>
+   <Polarize type="381" polarizabilityXX="0.000" polarizabilityYY="0.000" polarizabilityZZ="0.000" thole="0.0"/>
  </MPIDForce>
 </ForceField>
 
