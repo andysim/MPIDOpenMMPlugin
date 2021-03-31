@@ -7,11 +7,14 @@ from sys import stdout, argv
 import mpidplugin
 import numpy as np
 
-pdb = PDBFile('mpidwater.pdb')
-forcefield = ForceField('mpidwater.xml')
-system = forcefield.createSystem(pdb.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds)
-integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 2*femtoseconds)
-#integrator = VerletIntegrator(1*femtoseconds)
+pdb = PDBFile('waterbox_31ang.pdb')
+
+#forcefield = ForceField('../parameters/tip3p.xml')
+#forcefield = ForceField('../parameters/swm6.xml')
+forcefield = ForceField('../parameters/swm4.xml')
+system = forcefield.createSystem(pdb.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds,
+                                 defaultTholeWidth=8)
+integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.1*femtoseconds)
 
 # Make sure all the forces we expect are present
 for force in range(system.getNumForces()):
@@ -36,16 +39,21 @@ context = simulation.context
 if pdb.topology.getPeriodicBoxVectors():
     context.setPeriodicBoxVectors(*pdb.topology.getPeriodicBoxVectors())
 
+if os.path.isfile('restart.xml'):
+    simulation.loadState('restart.xml')
+
 print("Running on ", context.getPlatform().getName(), " Device ID:", deviceid)
 
 # Initialize
 context.setPositions(pdb.positions)
 
+nsteps = 500
+
 # Dump trajectory info every 10ps
-simulation.reporters.append(DCDReporter('output.dcd', 5000))
+#simulation.reporters.append(DCDReporter('output.dcd', 5000))
 # Dump simulation info every 1ps
-simulation.reporters.append(StateDataReporter(stdout, 500,
-                            step=True, potentialEnergy=True, totalEnergy=True, temperature=True))
-simulation.reporters.append(PDBReporter('equilibrated.pdb', 100000))
-# Run 100ps of simulation
-simulation.step(100000)
+simulation.reporters.append(StateDataReporter(stdout, 1, progress=True, totalSteps=nsteps,
+                            step=True, potentialEnergy=True, totalEnergy=True, temperature=True, density=True, speed=True))
+simulation.step(nsteps)
+
+#simulation.saveState('restart.xml')
