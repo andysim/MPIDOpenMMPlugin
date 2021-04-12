@@ -620,10 +620,6 @@ class MPIDGenerator(object):
                 octopole.append(conversion*float(atom.get('oXZZ')))
                 octopole.append(conversion*float(atom.get('oYZZ')))
                 octopole.append(conversion*float(atom.get('oZZZ')))
-                print(charge)
-                print(dipole)
-                print(quadrupole)
-                print(octopole)
 
                 for t in types[0]:
                     if (t not in generator.typeMap):
