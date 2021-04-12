@@ -14,7 +14,8 @@ pdb = PDBFile('waterbox_31ang.pdb')
 forcefield = ForceField('../parameters/swm4.xml')
 system = forcefield.createSystem(pdb.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds,
                                  defaultTholeWidth=8)
-integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.1*femtoseconds)
+integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 2*femtoseconds)
+system.addForce(MonteCarloBarostat(1*atmosphere, 300*kelvin, 25))
 
 # Make sure all the forces we expect are present
 for force in range(system.getNumForces()):
@@ -47,13 +48,13 @@ print("Running on ", context.getPlatform().getName(), " Device ID:", deviceid)
 # Initialize
 context.setPositions(pdb.positions)
 
-nsteps = 500
+nsteps = 50000
 
 # Dump trajectory info every 10ps
 #simulation.reporters.append(DCDReporter('output.dcd', 5000))
 # Dump simulation info every 1ps
-simulation.reporters.append(StateDataReporter(stdout, 1, progress=True, totalSteps=nsteps,
+simulation.reporters.append(StateDataReporter(stdout, 500, progress=True, totalSteps=nsteps,
                             step=True, potentialEnergy=True, totalEnergy=True, temperature=True, density=True, speed=True))
 simulation.step(nsteps)
 
-#simulation.saveState('restart.xml')
+simulation.saveState('restart.xml')
