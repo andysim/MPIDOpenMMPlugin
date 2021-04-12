@@ -594,32 +594,32 @@ class MPIDGenerator(object):
 
                 # set multipole
 
-                charge = float(atom.attrib['c0'])
+                charge = float(atom.get('c0'))
 
                 conversion = 1.0
-                dipole = [ conversion*float(atom.attrib['dX']),
-                           conversion*float(atom.attrib['dY']),
-                           conversion*float(atom.attrib['dZ']) ]
+                dipole = [ conversion*float(atom.get('dX')),
+                           conversion*float(atom.get('dY')),
+                           conversion*float(atom.get('dZ')) ]
 
                 quadrupole = []
-                quadrupole.append(conversion*float(atom.attrib['qXX']))
-                quadrupole.append(conversion*float(atom.attrib['qXY']))
-                quadrupole.append(conversion*float(atom.attrib['qYY']))
-                quadrupole.append(conversion*float(atom.attrib['qXZ']))
-                quadrupole.append(conversion*float(atom.attrib['qYZ']))
-                quadrupole.append(conversion*float(atom.attrib['qZZ']))
+                quadrupole.append(conversion*float(atom.get('qXX')))
+                quadrupole.append(conversion*float(atom.get('qXY')))
+                quadrupole.append(conversion*float(atom.get('qYY')))
+                quadrupole.append(conversion*float(atom.get('qXZ')))
+                quadrupole.append(conversion*float(atom.get('qYZ')))
+                quadrupole.append(conversion*float(atom.get('qZZ')))
 
                 octopole = []
-                octopole.append(conversion*float(atom.attrib['oXXX']))
-                octopole.append(conversion*float(atom.attrib['oXXY']))
-                octopole.append(conversion*float(atom.attrib['oXYY']))
-                octopole.append(conversion*float(atom.attrib['oYYY']))
-                octopole.append(conversion*float(atom.attrib['oXXZ']))
-                octopole.append(conversion*float(atom.attrib['oXYZ']))
-                octopole.append(conversion*float(atom.attrib['oYYZ']))
-                octopole.append(conversion*float(atom.attrib['oXZZ']))
-                octopole.append(conversion*float(atom.attrib['oYZZ']))
-                octopole.append(conversion*float(atom.attrib['oZZZ']))
+                octopole.append(conversion*float(atom.get('oXXX')))
+                octopole.append(conversion*float(atom.get('oXXY')))
+                octopole.append(conversion*float(atom.get('oXYY')))
+                octopole.append(conversion*float(atom.get('oYYY')))
+                octopole.append(conversion*float(atom.get('oXXZ')))
+                octopole.append(conversion*float(atom.get('oXYZ')))
+                octopole.append(conversion*float(atom.get('oYYZ')))
+                octopole.append(conversion*float(atom.get('oXZZ')))
+                octopole.append(conversion*float(atom.get('oYZZ')))
+                octopole.append(conversion*float(atom.get('oZZZ')))
 
                 for t in types[0]:
                     if (t not in generator.typeMap):
