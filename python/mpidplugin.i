@@ -516,39 +516,48 @@ class MPIDGenerator(object):
                 # set axis type
 
                 kIndicesLen = len(kIndices)
+
                 if (kIndicesLen > 3):
                     ky = kIndices[3]
+                    kyNegative = False
+                    if ky.startswith('-'):
+                        ky = kIndices[3] = ky[1:]
+                        kyNegative = True
                 else:
-                    ky = 0
+                    ky = ""
 
                 if (kIndicesLen > 2):
                     kx = kIndices[2]
+                    kxNegative = False
+                    if kx.startswith('-'):
+                        kx = kIndices[2] = kx[1:]
+                        kxNegative = True
                 else:
-                    kx = 0
+                    kx = ""
 
                 if (kIndicesLen > 1):
                     kz = kIndices[1]
+                    kzNegative = False
+                    if kz.startswith('-'):
+                        kz = kIndices[1] = kz[1:]
+                        kzNegative = True
                 else:
-                    kz = 0
+                    kz = ""
 
                 while(len(kIndices) < 4):
-                    kIndices.append(0)
+                    kIndices.append("")
 
                 axisType = MPIDForce.ZThenX
-                if (kz == 0):
+                if (not kz):
                     axisType = MPIDForce.NoAxisType
-                if (kz != 0 and kx == 0):
+                if (kz and not kx):
                     axisType = MPIDForce.ZOnly
-                if (kz < 0 or kx < 0):
+                if (kz and kzNegative or kx and kxNegative):
                     axisType = MPIDForce.Bisector
-                if (kx < 0 and ky < 0):
+                if (kx and kxNegative and ky and kyNegative):
                     axisType = MPIDForce.ZBisect
-                if (kz < 0 and kx < 0 and ky  < 0):
+                if (kz and kzNegative and kx and kxNegative and ky and kyNegative):
                     axisType = MPIDForce.ThreeFold
-
-                kIndices[1] = abs(kz)
-                kIndices[2] = abs(kx)
-                kIndices[3] = abs(ky)
 
                 return axisType
 
@@ -578,13 +587,13 @@ class MPIDGenerator(object):
 
                 # k-indices not provided default to 0
 
-                kIndices = [int(atom.attrib['type'])]
+                kIndices = [atom.attrib['type']]
 
                 kStrings = [ 'kz', 'kx', 'ky' ]
                 for kString in kStrings:
                     try:
                         if (atom.attrib[kString]):
-                             kIndices.append(int(atom.attrib[kString]))
+                             kIndices.append(atom.attrib[kString])
                     except:
                         pass
 
@@ -597,29 +606,29 @@ class MPIDGenerator(object):
                 charge = float(atom.get('c0'))
 
                 conversion = 1.0
-                dipole = [ conversion*float(atom.get('dX')),
-                           conversion*float(atom.get('dY')),
-                           conversion*float(atom.get('dZ')) ]
+                dipole = [ conversion*float(atom.get('dX', 0.0)),
+                           conversion*float(atom.get('dY', 0.0)),
+                           conversion*float(atom.get('dZ', 0.0)) ]
 
                 quadrupole = []
-                quadrupole.append(conversion*float(atom.get('qXX')))
-                quadrupole.append(conversion*float(atom.get('qXY')))
-                quadrupole.append(conversion*float(atom.get('qYY')))
-                quadrupole.append(conversion*float(atom.get('qXZ')))
-                quadrupole.append(conversion*float(atom.get('qYZ')))
-                quadrupole.append(conversion*float(atom.get('qZZ')))
+                quadrupole.append(conversion*float(atom.get('qXX', 0.0)))
+                quadrupole.append(conversion*float(atom.get('qXY', 0.0)))
+                quadrupole.append(conversion*float(atom.get('qYY', 0.0)))
+                quadrupole.append(conversion*float(atom.get('qXZ', 0.0)))
+                quadrupole.append(conversion*float(atom.get('qYZ', 0.0)))
+                quadrupole.append(conversion*float(atom.get('qZZ', 0.0)))
 
                 octopole = []
-                octopole.append(conversion*float(atom.get('oXXX')))
-                octopole.append(conversion*float(atom.get('oXXY')))
-                octopole.append(conversion*float(atom.get('oXYY')))
-                octopole.append(conversion*float(atom.get('oYYY')))
-                octopole.append(conversion*float(atom.get('oXXZ')))
-                octopole.append(conversion*float(atom.get('oXYZ')))
-                octopole.append(conversion*float(atom.get('oYYZ')))
-                octopole.append(conversion*float(atom.get('oXZZ')))
-                octopole.append(conversion*float(atom.get('oYZZ')))
-                octopole.append(conversion*float(atom.get('oZZZ')))
+                octopole.append(conversion*float(atom.get('oXXX', 0.0)))
+                octopole.append(conversion*float(atom.get('oXXY', 0.0)))
+                octopole.append(conversion*float(atom.get('oXYY', 0.0)))
+                octopole.append(conversion*float(atom.get('oYYY', 0.0)))
+                octopole.append(conversion*float(atom.get('oXXZ', 0.0)))
+                octopole.append(conversion*float(atom.get('oXYZ', 0.0)))
+                octopole.append(conversion*float(atom.get('oYYZ', 0.0)))
+                octopole.append(conversion*float(atom.get('oXZZ', 0.0)))
+                octopole.append(conversion*float(atom.get('oYZZ', 0.0)))
+                octopole.append(conversion*float(atom.get('oZZZ', 0.0)))
 
                 for t in types[0]:
                     if (t not in generator.typeMap):
@@ -820,15 +829,15 @@ class MPIDGenerator(object):
                        if (hit != 0):
                            break
 
-                       bondedAtomZType = int(data.atomType[data.atoms[bondedAtomZIndex]])
+                       bondedAtomZType = data.atomType[data.atoms[bondedAtomZIndex]]
                        bondedAtomZ = data.atoms[bondedAtomZIndex]
                        if (bondedAtomZType == kz):
                           for bondedAtomXIndex in bondedAtomIndices:
                               if (bondedAtomXIndex == bondedAtomZIndex or hit != 0):
                                   continue
-                              bondedAtomXType = int(data.atomType[data.atoms[bondedAtomXIndex]])
+                              bondedAtomXType = data.atomType[data.atoms[bondedAtomXIndex]]
                               if (bondedAtomXType == kx):
-                                  if (ky == 0):
+                                  if (not ky):
                                       zaxis = bondedAtomZIndex
                                       xaxis = bondedAtomXIndex
                                       if( bondedAtomXType == bondedAtomZType and xaxis < zaxis ):
@@ -837,7 +846,7 @@ class MPIDGenerator(object):
                                           xaxis = swapI
                                       else:
                                           for bondedAtomXIndex in bondedAtomIndices:
-                                              bondedAtomX1Type = int(data.atomType[data.atoms[bondedAtomXIndex]])
+                                              bondedAtomX1Type = data.atomType[data.atoms[bondedAtomXIndex]]
                                               if( bondedAtomX1Type == kx and bondedAtomXIndex != bondedAtomZIndex and bondedAtomXIndex < xaxis ):
                                                   xaxis = bondedAtomXIndex
 
@@ -847,7 +856,7 @@ class MPIDGenerator(object):
                                       for bondedAtomYIndex in bondedAtomIndices:
                                           if (bondedAtomYIndex == bondedAtomZIndex or bondedAtomYIndex == bondedAtomXIndex or hit != 0):
                                               continue
-                                          bondedAtomYType = int(data.atomType[data.atoms[bondedAtomYIndex]])
+                                          bondedAtomYType = data.atomType[data.atoms[bondedAtomYIndex]]
                                           if (bondedAtomYType == ky):
                                               zaxis = bondedAtomZIndex
                                               xaxis = bondedAtomXIndex
@@ -884,7 +893,7 @@ class MPIDGenerator(object):
                        if (hit != 0):
                            break
 
-                       bondedAtomZType = int(data.atomType[data.atoms[bondedAtomZIndex]])
+                       bondedAtomZType = data.atomType[data.atoms[bondedAtomZIndex]]
                        bondedAtomZ = data.atoms[bondedAtomZIndex]
 
                        if (bondedAtomZType == kz):
@@ -892,16 +901,16 @@ class MPIDGenerator(object):
 
                               if (bondedAtomXIndex == bondedAtomZIndex or hit != 0):
                                   continue
-                              bondedAtomXType = int(data.atomType[data.atoms[bondedAtomXIndex]])
+                              bondedAtomXType = data.atomType[data.atoms[bondedAtomXIndex]]
                               if (bondedAtomXType == kx and bondedAtomZIndex in bonded12ParticleSets[bondedAtomXIndex]):
-                                  if (ky == 0):
+                                  if (not ky):
                                       zaxis = bondedAtomZIndex
                                       xaxis = bondedAtomXIndex
 
                                       # select xaxis w/ smallest index
 
                                       for bondedAtomXIndex in bondedAtom13Indices:
-                                          bondedAtomX1Type = int(data.atomType[data.atoms[bondedAtomXIndex]])
+                                          bondedAtomX1Type = data.atomType[data.atoms[bondedAtomXIndex]]
                                           if( bondedAtomX1Type == kx and bondedAtomXIndex != bondedAtomZIndex and bondedAtomZIndex in bonded12ParticleSets[bondedAtomXIndex] and bondedAtomXIndex < xaxis ):
                                               xaxis = bondedAtomXIndex
 
@@ -911,7 +920,7 @@ class MPIDGenerator(object):
                                       for bondedAtomYIndex in bondedAtom13Indices:
                                           if (bondedAtomYIndex == bondedAtomZIndex or bondedAtomYIndex == bondedAtomXIndex or hit != 0):
                                               continue
-                                          bondedAtomYType = int(data.atomType[data.atoms[bondedAtomYIndex]])
+                                          bondedAtomYType = data.atomType[data.atoms[bondedAtomYIndex]]
                                           if (bondedAtomYType == ky and bondedAtomZIndex in bonded12ParticleSets[bondedAtomYIndex]):
                                               zaxis = bondedAtomZIndex
                                               xaxis = bondedAtomXIndex
@@ -940,10 +949,10 @@ class MPIDGenerator(object):
                         if (hit != 0):
                             break
 
-                        bondedAtomZType = int(data.atomType[data.atoms[bondedAtomZIndex]])
+                        bondedAtomZType = data.atomType[data.atoms[bondedAtomZIndex]]
                         bondedAtomZ = data.atoms[bondedAtomZIndex]
 
-                        if (kx == 0 and kz == bondedAtomZType):
+                        if (not kx and kz == bondedAtomZType):
                             zaxis = bondedAtomZIndex
                             savedMultipoleDict = multipoleDict
                             hit = 5
@@ -963,7 +972,7 @@ class MPIDGenerator(object):
                     xaxis = -1
                     yaxis = -1
 
-                    if (kz == 0):
+                    if (not kz):
                         savedMultipoleDict = multipoleDict
                         hit = 6
 
@@ -973,9 +982,18 @@ class MPIDGenerator(object):
 
                     atom.multipoleDict = savedMultipoleDict
                     atom.polarizationGroups = dict()
+                    try:
+                        thole = savedMultipoleDict['thole']
+                    except KeyError:
+                        thole = 0.0
+                    try:
+                        polarizability = savedMultipoleDict['polarizability']
+                    except KeyError:
+                        polarizability = [0.0, 0.0, 0.0]
+
                     newIndex = force.addMultipole(savedMultipoleDict['charge'], savedMultipoleDict['dipole'],
                                                   savedMultipoleDict['quadrupole'], savedMultipoleDict['octopole'], savedMultipoleDict['axisType'],
-                                                  zaxis, xaxis, yaxis, savedMultipoleDict['thole'], savedMultipoleDict['polarizability'])
+                                                  zaxis, xaxis, yaxis, thole, polarizability)
                     if (atomIndex == newIndex):
                         force.setCovalentMap(atomIndex, MPIDForce.Covalent12, tuple(bonded12ParticleSets[atomIndex]))
                         force.setCovalentMap(atomIndex, MPIDForce.Covalent13, tuple(bonded13ParticleSets[atomIndex]))
