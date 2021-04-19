@@ -54,10 +54,9 @@ print(f'initial energy = ',context.getState(getEnergy=True).getPotentialEnergy()
 lambdas = np.arange(0.0, 1.05, 0.1)
 selection = range(8)  # We know the first 8 atoms are ethane
 elec_params = []
-for lam in lambdas:
-    for i in selection:
-        #charge, dipole, qpole, opole, axis, atomZ, atomX, atomY, thole, alphas
-        elec_params.append(mpidforce.getMultipoleParameters(i))
+for i in selection:
+    #charge, dipole, qpole, opole, axis, atomZ, atomX, atomY, thole, alphas
+    elec_params.append(mpidforce.getMultipoleParameters(i))
 
 for lam in lambdas:
     for i in selection:
@@ -72,10 +71,9 @@ for lam in lambdas:
 
 # Turn on the VDW terms in increments, after storing the initial values
 vdw_params = []
-for lam in lambdas:
-    for i in selection:
-        #charge, sigma, epsilon
-        vdw_params.append(forces['NonbondedForce'].getParticleParameters(i))
+for i in selection:
+    #charge, sigma, epsilon
+    vdw_params.append(forces['NonbondedForce'].getParticleParameters(i))
 
 for lam in lambdas:
     for i in selection:
