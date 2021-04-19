@@ -89,6 +89,19 @@ public:
      */
     MPIDForce();
 
+    /*
+     * Methods for casting a Force to an MPIDForce.
+    */
+    %extend {
+        static OpenMM::MPIDForce& cast(OpenMM::Force& force) {
+            return dynamic_cast<OpenMM::MPIDForce&>(force);
+        }
+
+        static bool isinstance(OpenMM::Force& force) {
+            return (dynamic_cast<OpenMM::MPIDForce*>(&force) != NULL);
+        }
+    }
+
     /**
      * Get the number of particles in the potential function
      */
@@ -271,7 +284,7 @@ public:
     %apply int& OUTPUT {int& multipoleAtomX};
     %apply int& OUTPUT {int& multipoleAtomY};
     %apply double& OUTPUT {double& thole};
-    %apply std::vector<double>& OUTPUT {double& alphas};
+    %apply std::vector<double>& OUTPUT {std::vector<double>& alphas};
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, std::vector<double>& molecularQuadrupole, std::vector<double>& molecularOctopole,
                                 int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY, double& thole, std::vector<double>& alphas) const;
     %clear double& charge;

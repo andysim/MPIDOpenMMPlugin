@@ -1387,6 +1387,8 @@ void CudaCalcMPIDForceKernel::copyParametersToContext(ContextImpl& context, cons
     for (int i = force.getNumMultipoles(); i < cu.getPaddedNumAtoms(); i++) {
         dampingAndTholeVec.push_back(make_float2(0, 0));
         polarizabilityVec.push_back(0);
+        polarizabilityVec.push_back(0);
+        polarizabilityVec.push_back(0);
         multipoleParticlesVec.push_back(make_int4(0, 0, 0, 0));
         for (int j = 0; j < 3; j++)
             molecularDipolesVec.push_back(0);
