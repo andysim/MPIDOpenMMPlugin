@@ -19,4 +19,7 @@ ethane_water_charge_only
 A single ethane molecule in a 35 Å box containing 1383 water molecules.  The
 initial PDB file was constructed using `openmm-setup` and the XML parameters
 were extracted from the CHARMM36 parameter file that ships with OpenMM, with
-arbitrarily chosen polarizability settings assigned to the heavy atoms.
+arbitrarily chosen polarizability settings assigned to the heavy atoms. The
+`run_ethane.py` example runs a short trajectory of this system, while the
+`alchemy_example.py` file demonstrates how to make alchemical changes to the
+ethane molecule to allow it to disappear in the water box.
