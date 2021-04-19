@@ -50,19 +50,27 @@ else:
     raise "Unknown custom force detected!"
 
 print(f'initial energy = ',context.getState(getEnergy=True).getPotentialEnergy())
-# Turn on the electrostatic terms in increments, after storing the initial values
+
+# Specify lambda windows for alchemical changes
 lambdas = np.arange(0.0, 1.05, 0.1)
 selection = range(8)  # We know the first 8 atoms are ethane
-elec_params = []
-for i in selection:
-    #charge, dipole, qpole, opole, axis, atomZ, atomX, atomY, thole, alphas
-    elec_params.append(mpidforce.getMultipoleParameters(i))
+
+# Turn on the electrostatic terms in increments, after storing the initial values
+# Order of parameters is
+# charge, dipole, qpole, opole, axis, atomZ, atomX, atomY, thole, alphas
+elec_params = [ mpidforce.getMultipoleParameters(i) for i in selection ]
 
 for lam in lambdas:
     for i in selection:
         params = elec_params[i].copy()
-        # charges
+        # charge
         params[0] *= lam
+        # dipoles
+        params[1] = [d * lam for d in params[1]]
+        # quadrupoles
+        params[2] = [q * lam for q in params[2]]
+        # octopoles
+        params[3] = [o * lam for o in params[3]]
         # polarizabilities
         params[9] = [a * lam for a in params[9]]
         mpidforce.setMultipoleParameters(i, *params)
@@ -70,10 +78,9 @@ for lam in lambdas:
     print(f'elec lambda = {lam:.2f}, energy = ',context.getState(getEnergy=True).getPotentialEnergy())
 
 # Turn on the VDW terms in increments, after storing the initial values
-vdw_params = []
-for i in selection:
-    #charge, sigma, epsilon
-    vdw_params.append(forces['NonbondedForce'].getParticleParameters(i))
+# Order of paramters is
+# charge, sigma, epsilon
+vdw_params = [ forces['NonbondedForce'].getParticleParameters(i) for i in selection ]
 
 for lam in lambdas:
     for i in selection:
@@ -81,4 +88,6 @@ for lam in lambdas:
         forces['NonbondedForce'].setParticleParameters(i, *params)
     forces['NonbondedForce'].updateParametersInContext(context)
     print(f'vdw lambda = {lam:.2f}, energy = ',context.getState(getEnergy=True).getPotentialEnergy())
+
+# Make sure the final energy is the same as the original (unperturbed) value, with roundoff error
 print(f'final energy = ',context.getState(getEnergy=True).getPotentialEnergy())
