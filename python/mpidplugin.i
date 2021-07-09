@@ -81,7 +81,7 @@ public:
     enum MultipoleAxisTypes { ZThenX = 0, Bisector = 1, ZBisect = 2, ThreeFold = 3, ZOnly = 4, NoAxisType = 5, LastAxisTypeIndex = 6 };
 
     enum CovalentType {
-                          Covalent12 = 0, Covalent13 = 1, Covalent14 = 2, Covalent15 = 3,
+                          Covalent12 = 0, Covalent13 = 1, Covalent14 = 2,
                           PolarizationCovalent11 = 4, PolarizationCovalent12 = 5, PolarizationCovalent13 = 6, PolarizationCovalent14 = 7, CovalentEnd = 8 };
 
     /**
@@ -788,25 +788,6 @@ class MPIDGenerator(object):
             bonded14Set = set(sorted(bonded14Set))
             bonded14ParticleSets.append(bonded14Set)
 
-        # 1-5
-
-        bonded15ParticleSets = []
-        for i in range(len(data.atoms)):
-            bonded15Set = set()
-            bonded14ParticleSet = bonded14ParticleSets[i]
-            for j in bonded14ParticleSet:
-                bonded15Set = bonded15Set.union(bonded12ParticleSets[j])
-
-            # remove 1-4, 1-3, 1-2 and self from set
-
-            bonded15Set = bonded15Set - bonded12ParticleSets[i]
-            bonded15Set = bonded15Set - bonded13ParticleSets[i]
-            bonded15Set = bonded15Set - bonded14ParticleSet
-            selfSet = set()
-            selfSet.add(i)
-            bonded15Set = bonded15Set - selfSet
-            bonded15Set = set(sorted(bonded15Set))
-            bonded15ParticleSets.append(bonded15Set)
 
         for (atomIndex, atom) in enumerate(data.atoms):
             t = data.atomType[atom]
@@ -1011,7 +992,6 @@ class MPIDGenerator(object):
                         force.setCovalentMap(atomIndex, MPIDForce.Covalent12, tuple(bonded12ParticleSets[atomIndex]))
                         force.setCovalentMap(atomIndex, MPIDForce.Covalent13, tuple(bonded13ParticleSets[atomIndex]))
                         force.setCovalentMap(atomIndex, MPIDForce.Covalent14, tuple(bonded14ParticleSets[atomIndex]))
-                        force.setCovalentMap(atomIndex, MPIDForce.Covalent15, tuple(bonded15ParticleSets[atomIndex]))
                     else:
                         raise ValueError("Atom %s of %s %d is out of sync!." %(atom.name, atom.residue.name, atom.residue.index))
                 else:
