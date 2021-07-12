@@ -171,6 +171,8 @@ void ReferenceCalcMPIDForceKernel::initialize(const System& system, const MPIDFo
     } else {
         usePme = false;
     }
+    scaleFactor14 = force.get14ScaleFactor();
+
     return;
 }
 
@@ -214,6 +216,7 @@ MPIDReferenceForce* ReferenceCalcMPIDForceKernel::setupMPIDReferenceForce(Contex
     } else {
         throw OpenMMException("Polarization type not recognzied.");
     }
+    mpidReferenceForce->set14ScaleFactor(scaleFactor14);
 
     return mpidReferenceForce;
 

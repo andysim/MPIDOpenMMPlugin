@@ -54,7 +54,7 @@
     <Atom charge="0.0" type="HA3" sigma="0.23876085646161097" epsilon="0.100416"/>
     <Atom charge="0.0" type="CT3" sigma="0.3634866770012585" epsilon="0.32635200000000003"/>
  </NonbondedForce>
- <MPIDForce>
+ <MPIDForce coulomb14scale="0.5" >
    <Multipole type="OW" c0="-0.834" />
    <Multipole type="HW" c0="0.417" />
    <Multipole type="HA3" c0="0.09" />

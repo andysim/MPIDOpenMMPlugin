@@ -153,6 +153,7 @@ private:
     bool usePme;
     double alphaEwald;
     double defaultTholeWidth;
+    double scaleFactor14;
     double cutoffDistance;
     std::vector<int> pmeGridDimension;
 

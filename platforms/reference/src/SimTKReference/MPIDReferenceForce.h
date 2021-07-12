@@ -555,6 +555,24 @@ public:
     double getMutualInducedDipoleTargetEpsilon() const;
 
     /**
+     * Set the scale permanent-permanent and permanent-induced scale factors
+     * for 1-4 connected connected atoms
+     *
+     * @param scaleFactor the factor by which the 1-4 interactions are scaled.
+     *
+     */
+    void set14ScaleFactor(double scaleFactor);
+
+    /**
+     * Get the scale permanent-permanent and permanent-induced scale factors
+     * for 1-4 connected connected atoms
+     *
+     * @return the factor by which the 1-4 interactions are scaled.
+     *
+     */
+    double get14ScaleFactor() const;
+
+    /**
      * Set the maximum number of iterations to be executed in converging mutual induced dipoles.
      *
      * @param maximumMutualInducedDipoleIterations maximum number of iterations to be executed in converging mutual induced dipoles

@@ -83,6 +83,7 @@ void MPIDForceProxy::serialize(const void* object, SerializationNode& node) cons
     node.setDoubleProperty("aEwald",                        alpha);
     node.setDoubleProperty("mutualInducedTargetEpsilon",    force.getMutualInducedTargetEpsilon());
     node.setDoubleProperty("ewaldErrorTolerance",           force.getEwaldErrorTolerance());
+    node.setDoubleProperty("scaleFactor14",                 force.get14ScaleFactor());
 
     SerializationNode& gridDimensionsNode  = node.createChildNode("MultipoleParticleGridDimension");
     gridDimensionsNode.setIntProperty("d0", nx).setIntProperty("d1", ny).setIntProperty("d2", nz); 
@@ -163,6 +164,7 @@ void* MPIDForceProxy::deserialize(const SerializationNode& node) const {
         force->setCutoffDistance(node.getDoubleProperty("cutoffDistance"));
         force->setMutualInducedTargetEpsilon(node.getDoubleProperty("mutualInducedTargetEpsilon"));
         force->setEwaldErrorTolerance(node.getDoubleProperty("ewaldErrorTolerance"));
+        force->set14ScaleFactor(node.getDoubleProperty("scaleFactor14"));
 
         const SerializationNode& gridDimensionsNode  = node.getChildNode("MultipoleParticleGridDimension");
         force->setPMEParameters(node.getDoubleProperty("aEwald"), gridDimensionsNode.getIntProperty("d0"), gridDimensionsNode.getIntProperty("d1"), gridDimensionsNode.getIntProperty("d2"));
