@@ -375,6 +375,20 @@ public:
     void setMutualInducedTargetEpsilon(double inputMutualInducedTargetEpsilon);
 
     /**
+     * Set the 1-4 scale factor, which scales all (i.e.
+     * polarizable-fixed and fixed-fixed) interactions
+
+     * @param scaleFactor the factor by which 1-4 interactions are scaled
+     */
+    void set14ScaleFactor(double val);
+
+    /**
+     * Get the 1-4 scale factor, which scales all (i.e.
+     * polarizable-fixed and fixed-fixed) interactions
+     */
+    double get14ScaleFactor() const;
+
+    /**
      * Set the coefficients for the mu_0, mu_1, mu_2, ..., mu_n terms in the extrapolation
      * algorithm for induced dipoles.
      *
@@ -505,6 +519,7 @@ public:
 
 %pythoncode %{
 import simtk.openmm.app.forcefield as forcefield
+import warnings
 
 ## @private
 class MPIDGenerator(object):
@@ -515,8 +530,9 @@ class MPIDGenerator(object):
 
     #=============================================================================================
 
-    def __init__(self, forceField):
+    def __init__(self, forceField, scaleFactor14):
         self.forceField = forceField
+        self.scaleFactor14 = scaleFactor14
         self.typeMap = {}
 
     #=============================================================================================
@@ -585,12 +601,13 @@ class MPIDGenerator(object):
 
         existing = [f for f in forceField._forces if isinstance(f, MPIDGenerator)]
         if len(existing) == 0:
-            generator = MPIDGenerator(forceField)
-            #forceField.registerGenerator(generator)
-            forceField._forces.append(generator)
+            generator = MPIDGenerator(forceField, element.get('coulomb14scale', None))
+            forceField.registerGenerator(generator)
         else:
             # Multiple <MPIDForce> tags were found, probably in different files.  Simply add more types to the existing one.
             generator = existing[0]
+            if abs(generator.scaleFactor14 != element.get('coulomb14scale', None)):
+                raise ValueError('Found multiple MPIDForce tags with different coulomb14scale arguments')
 
         # set type map: [ kIndices, multipoles, AMOEBA/OpenMM axis type]
 
@@ -726,6 +743,18 @@ class MPIDGenerator(object):
                 force.setPolarizationType(MPIDForce.Extrapolated)
             else:
                 raise ValueError( "MPIDForce: invalide polarization type: " + polarizationType)
+
+        argval = float(args['coulomb14scale']) if 'coulomb14scale' in args else None
+        myval = float(self.scaleFactor14) if self.scaleFactor14 else None
+        if argval is not None:
+            if myval is not None:
+                if myval != argval:
+                     warnings.warn( "Conflicting coulomb14scale values found in forcefield file ({}) and createSystem args ({}).  "
+                                    "Using the value from createSystem's arguments".format(myval, argval))
+            force.set14ScaleFactor(argval)
+        else:
+            if myval is not None:
+                force.set14ScaleFactor(myval)
 
         if ('defaultTholeWidth' in args):
             force.setDefaultTholeWidth(float(args['defaultTholeWidth']))

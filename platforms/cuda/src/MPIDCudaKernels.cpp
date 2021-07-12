@@ -458,6 +458,7 @@ void CudaCalcMPIDForceKernel::initialize(const System& system, const MPIDForce& 
         defines["USE_PERIODIC"] = "";
         defines["CUTOFF_SQUARED"] = cu.doubleToString(force.getCutoffDistance()*force.getCutoffDistance());
     }
+    defines["SCALEFACTOR14"] = cu.doubleToString(force.get14ScaleFactor());
     int maxThreads = cu.getNonbondedUtilities().getForceThreadBlockSize();
     fixedFieldThreads = min(maxThreads, cu.computeThreadBlockSize(fixedThreadMemory));
     inducedFieldThreads = min(maxThreads, cu.computeThreadBlockSize(inducedThreadMemory));

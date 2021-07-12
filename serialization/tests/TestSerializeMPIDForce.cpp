@@ -76,6 +76,7 @@ void testSerialization() {
     force1.setMutualInducedTargetEpsilon(1.0e-05); 
     //force1.setElectricConstant(138.93); 
     force1.setEwaldErrorTolerance(1.0e-05); 
+    force1.set14ScaleFactor(0.4);
     
     vector<double> coeff;
     coeff.push_back(0.0);
@@ -128,6 +129,7 @@ void testSerialization() {
     ASSERT_EQUAL(force1.getMutualInducedMaxIterations(),    force2.getMutualInducedMaxIterations());
     ASSERT_EQUAL(force1.getMutualInducedTargetEpsilon(),    force2.getMutualInducedTargetEpsilon());
     ASSERT_EQUAL(force1.getEwaldErrorTolerance(),           force2.getEwaldErrorTolerance());
+    ASSERT_EQUAL(force1.get14ScaleFactor(),                 force2.get14ScaleFactor());
 
 
     std::vector<int> gridDimension1;

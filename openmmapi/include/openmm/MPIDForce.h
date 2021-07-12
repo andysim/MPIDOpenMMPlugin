@@ -453,13 +453,29 @@ public:
      */
     double getDefaultTholeWidth() const;
 
+    /**
+     * Set the 1-4 scale factor, which scales all (i.e.
+     * polarizable-fixed and fixed-fixed) interactions
+     *
+     * @param scaleFactor the scale factor for 1-4 interactions.
+     */
+    void set14ScaleFactor(double scaleFactor);
+
+    /**
+     * Get the 1-4 scale factor, which scales all (i.e.
+     * polarizable-fixed and fixed-fixed) interactions
+     *
+     * @returns the scale factor for 1-4 interactions.
+     */
+    double get14ScaleFactor() const;
+
 protected:
     ForceImpl* createImpl() const;
 private:
     NonbondedMethod nonbondedMethod;
     PolarizationType polarizationType;
     double cutoffDistance;
-    double alpha, defaultThole;
+    double alpha, defaultThole, scaleFactor14;
     int pmeBSplineOrder, nx, ny, nz;
     int mutualInducedMaxIterations;
     std::vector<double> extrapolationCoefficients;

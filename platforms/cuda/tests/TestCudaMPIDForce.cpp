@@ -61,6 +61,51 @@ extern "C" void registerMPIDCudaKernelFactories();
 
 const double TOL = 1e-4;
 
+void make_charge_square(double boxEdgeLength, vector<Vec3> &positions, MPIDForce *forceField, System &system)
+{
+    positions.clear();
+
+    // 0  3
+    // |  |
+    // 1--2
+
+    // Atom 0
+    positions.push_back(Vec3(0.1, 0.0, 0.0));
+    forceField->addMultipole(1.0, {0,0,0}, {0,0,0,0,0,0}, {0,0,0,0,0,0,0,0,0,0}, MPIDForce::NoAxisType, 0, 0, 0, 0.0, {0.0, 0.0, 0.0});
+    system.addParticle(1.0);
+    forceField->setCovalentMap(0, MPIDForce::Covalent12, {1});
+    forceField->setCovalentMap(0, MPIDForce::Covalent13, {2});
+    forceField->setCovalentMap(0, MPIDForce::Covalent14, {3});
+
+    // Atom 1
+    positions.push_back(Vec3(0.0, 0.0, 0.0));
+    forceField->addMultipole(1.0, {0,0,0}, {0,0,0,0,0,0}, {0,0,0,0,0,0,0,0,0,0}, MPIDForce::NoAxisType, 0, 0, 0, 0.0, {0.0, 0.0, 0.0});
+    system.addParticle(1.0);
+    forceField->setCovalentMap(1, MPIDForce::Covalent12, {0, 2});
+    forceField->setCovalentMap(1, MPIDForce::Covalent13, {3});
+
+    // Atom 2
+    positions.push_back(Vec3(0.0, 0.1, 0.0));
+    forceField->addMultipole(-1.0, {0,0,0}, {0,0,0,0,0,0}, {0,0,0,0,0,0,0,0,0,0}, MPIDForce::NoAxisType, 0, 0, 0, 0.0, {0.0, 0.0, 0.0});
+    system.addParticle(1.0);
+    forceField->setCovalentMap(2, MPIDForce::Covalent12, {1, 3});
+    forceField->setCovalentMap(2, MPIDForce::Covalent13, {0});
+
+    // Atom 3
+    positions.push_back(Vec3(0.1, 0.1, 0.0));
+    forceField->addMultipole(-1.0, {0,0,0}, {0,0,0,0,0,0}, {0,0,0,0,0,0,0,0,0,0}, MPIDForce::NoAxisType, 0, 0, 0, 0.0, {0.0, 0.0, 0.0});
+    system.addParticle(1.0);
+    forceField->setCovalentMap(3, MPIDForce::Covalent12, {2});
+    forceField->setCovalentMap(3, MPIDForce::Covalent13, {1});
+    forceField->setCovalentMap(3, MPIDForce::Covalent14, {0});
+
+    system.setDefaultPeriodicBoxVectors(Vec3(boxEdgeLength, 0, 0),
+                                        Vec3(0, boxEdgeLength, 0),
+                                        Vec3(0, 0, boxEdgeLength));
+
+}
+
+
 void make_waterbox(int natoms, double boxEdgeLength, MPIDForce *forceField,  vector<Vec3> &positions, System &system,
                    bool do_charge = true, bool do_dpole = true, bool do_qpole = true, bool do_opole = true, bool do_pol = true)
 {
@@ -1558,6 +1603,105 @@ void testWaterDimerEnergyAndForcesNoCutExtrapolated() {
 //    check_full_finite_differences(forces, context, positions, 1E-4, 1E-4);
 }
 
+void test14ScalingNoCutoff() {
+    // Water box with isotropic induced dipoles
+    double boxEdgeLength = 20*OpenMM::NmPerAngstrom;
+    MPIDForce* forceField1 = new MPIDForce();
+    MPIDForce* forceField2 = new MPIDForce();
+    MPIDForce* forceField3 = new MPIDForce();
+    vector<Vec3> positions;
+
+    double energy;
+    System system1, system2, system3;
+    State state;
+
+    make_charge_square(boxEdgeLength, positions, forceField1, system1);
+    forceField1->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    system1.addForce(forceField1);
+    VerletIntegrator integrator1(0.01);
+    Context context1(system1, integrator1, Platform::getPlatformByName("CUDA"));
+    context1.setPositions(positions);
+    state = context1.getState(State::Forces | State::Energy);
+    energy = state.getPotentialEnergy();
+    ASSERT_EQUAL_TOL(energy, -1389.35, 1E-5);
+
+    make_charge_square(boxEdgeLength, positions, forceField2, system2);
+    forceField2->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField2->set14ScaleFactor(0.5);
+    system2.addForce(forceField2);
+    VerletIntegrator integrator2(0.01);
+    Context context2(system2, integrator2, Platform::getPlatformByName("CUDA"));
+    context2.setPositions(positions);
+    state = context2.getState(State::Forces | State::Energy);
+    energy = state.getPotentialEnergy();
+    ASSERT_EQUAL_TOL(energy, -1389.35/2, 1E-5);
+
+    make_charge_square(boxEdgeLength, positions, forceField3, system3);
+    forceField3->setNonbondedMethod(OpenMM::MPIDForce::NoCutoff);
+    forceField3->set14ScaleFactor(0.0);
+    system3.addForce(forceField3);
+    VerletIntegrator integrator3(0.01);
+    Context context3(system3, integrator3, Platform::getPlatformByName("CUDA"));
+    context3.setPositions(positions);
+    state = context3.getState(State::Forces | State::Energy);
+    energy = state.getPotentialEnergy();
+    ASSERT_EQUAL_TOL(energy, 0.0, 1E-5);
+}
+
+void test14ScalingPME() {
+    // Water box with isotropic induced dipoles
+    const double cutoff = 4.0*OpenMM::NmPerAngstrom;
+    double boxEdgeLength = 30*OpenMM::NmPerAngstrom;
+    const int grid = 64;
+    MPIDForce* forceField1 = new MPIDForce();
+    MPIDForce* forceField2 = new MPIDForce();
+    MPIDForce* forceField3 = new MPIDForce();
+    vector<Vec3> positions;
+
+    double energy;
+    System system1, system2, system3;
+    State state;
+
+    make_charge_square(boxEdgeLength, positions, forceField1, system1);
+    forceField1->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField1->setCutoffDistance(cutoff);
+    forceField1->setPMEParameters(0.001, grid, grid, grid);
+    system1.addForce(forceField1);
+    VerletIntegrator integrator1(0.01);
+    Context context1(system1, integrator1, Platform::getPlatformByName("CUDA"));
+    context1.setPositions(positions);
+    state = context1.getState(State::Forces | State::Energy);
+    energy = state.getPotentialEnergy();
+    ASSERT_EQUAL_TOL(energy, -1389.35, 1E-3);
+
+    make_charge_square(boxEdgeLength, positions, forceField2, system2);
+    forceField2->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField2->setCutoffDistance(cutoff);
+    forceField2->setPMEParameters(0.001, grid, grid, grid);
+    forceField2->set14ScaleFactor(0.5);
+    system2.addForce(forceField2);
+    VerletIntegrator integrator2(0.01);
+    Context context2(system2, integrator2, Platform::getPlatformByName("CUDA"));
+    context2.setPositions(positions);
+    state = context2.getState(State::Forces | State::Energy);
+    energy = state.getPotentialEnergy();
+    ASSERT_EQUAL_TOL(energy, -1389.35/2, 1E-3);
+
+    make_charge_square(boxEdgeLength, positions, forceField3, system3);
+    forceField3->setNonbondedMethod(OpenMM::MPIDForce::PME);
+    forceField3->setCutoffDistance(cutoff);
+    forceField3->setPMEParameters(0.001, grid, grid, grid);
+    forceField3->set14ScaleFactor(0.0);
+    system3.addForce(forceField3);
+    VerletIntegrator integrator3(0.01);
+    Context context3(system3, integrator3, Platform::getPlatformByName("CUDA"));
+    context3.setPositions(positions);
+    state = context3.getState(State::Forces | State::Energy);
+    energy = state.getPotentialEnergy();
+    ASSERT_EQUAL_TOL(energy, 0.0, 1E-3);
+}
+
+
 
 int main(int argc, char* argv[]) {
     try {
@@ -1566,6 +1710,8 @@ int main(int argc, char* argv[]) {
         if (argc > 1)
             Platform::getPlatformByName("CUDA").setPropertyDefaultValue("Precision", std::string(argv[1]));
 
+        test14ScalingNoCutoff();
+        test14ScalingPME();
         testWaterDimerEnergyAndForcesPMEDirect();
         testWaterDimerEnergyAndForcesNoCutDirect();
         testWaterDimerEnergyAndForcesPMEMutual();

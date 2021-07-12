@@ -84,6 +84,17 @@ void MPIDReferenceForce::initialize()
     _pScale[index++]      = 1.0;
 }
 
+void MPIDReferenceForce::set14ScaleFactor(double factor)
+{
+    _pScale[3] = _mScale[3] = factor;
+}
+
+double MPIDReferenceForce::get14ScaleFactor() const
+{
+    assert(_pScale[3] == _mScale[3]);
+    return _pScale[3];
+}
+
 MPIDReferenceForce::NonbondedMethod MPIDReferenceForce::getNonbondedMethod() const
 {
     return _nonbondedMethod;
