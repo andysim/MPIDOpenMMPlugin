@@ -41,7 +41,7 @@ using std::string;
 using std::vector;
 
 MPIDForce::MPIDForce() : nonbondedMethod(NoCutoff), polarizationType(Extrapolated), pmeBSplineOrder(6), cutoffDistance(1.0), ewaldErrorTol(5e-4), mutualInducedMaxIterations(60),
-                                               mutualInducedTargetEpsilon(1.0e-02), scalingDistanceCutoff(100.0), electricConstant(138.9354558456), defaultThole(5.0),
+                                               mutualInducedTargetEpsilon(1.0e-5), scalingDistanceCutoff(100.0), electricConstant(138.9354558456), defaultThole(5.0),
                                                alpha(0.0), nx(0), ny(0), nz(0), scaleFactor14(1.0) {
     extrapolationCoefficients.push_back(-0.154);
     extrapolationCoefficients.push_back(0.017);
