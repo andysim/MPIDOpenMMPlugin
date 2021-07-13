@@ -530,9 +530,10 @@ class MPIDGenerator(object):
 
     #=============================================================================================
 
-    def __init__(self, forceField, scaleFactor14):
+    def __init__(self, forceField, scaleFactor14, defaultTholeWidth):
         self.forceField = forceField
         self.scaleFactor14 = scaleFactor14
+        self.defaultTholeWidth = defaultTholeWidth
         self.typeMap = {}
 
     #=============================================================================================
@@ -601,13 +602,15 @@ class MPIDGenerator(object):
 
         existing = [f for f in forceField._forces if isinstance(f, MPIDGenerator)]
         if len(existing) == 0:
-            generator = MPIDGenerator(forceField, element.get('coulomb14scale', None))
+            generator = MPIDGenerator(forceField, element.get('coulomb14scale', None), element.get('defaultTholeWidth', None))
             forceField.registerGenerator(generator)
         else:
             # Multiple <MPIDForce> tags were found, probably in different files.  Simply add more types to the existing one.
             generator = existing[0]
             if abs(generator.scaleFactor14 != element.get('coulomb14scale', None)):
                 raise ValueError('Found multiple MPIDForce tags with different coulomb14scale arguments')
+            if abs(generator.defaultTholeWidth != element.get('defaultTholeWidth', None)):
+                raise ValueError('Found multiple MPIDForce tags with different defaultTholeWidth arguments')
 
         # set type map: [ kIndices, multipoles, AMOEBA/OpenMM axis type]
 
@@ -756,8 +759,17 @@ class MPIDGenerator(object):
             if myval is not None:
                 force.set14ScaleFactor(myval)
 
-        if ('defaultTholeWidth' in args):
-            force.setDefaultTholeWidth(float(args['defaultTholeWidth']))
+        argval = float(args['defaultTholeWidth']) if 'defaultTholeWidth' in args else None
+        myval = float(self.defaultTholeWidth) if self.defaultTholeWidth else None
+        if argval is not None:
+            if myval is not None:
+                if myval != argval:
+                     warnings.warn( "Conflicting defaultTholeWidth values found in forcefield file ({}) and createSystem args ({}).  "
+                                    "Using the value from createSystem's arguments".format(myval, argval))
+            force.setDefaultTholeWidth(argval)
+        else:
+            if myval is not None:
+                force.setDefaultTholeWidth(myval)
 
         if ('aEwald' in args):
             force.setAEwald(float(args['aEwald']))
