@@ -10,8 +10,8 @@ import numpy as np
 pdb = PDBFile('waterbox_31ang.pdb')
 
 #forcefield = ForceField('../parameters/tip3p.xml')
-#forcefield = ForceField('../parameters/swm6.xml')
-forcefield = ForceField('../parameters/swm4.xml')
+#forcefield = ForceField('../parameters/swm4.xml')
+forcefield = ForceField('../parameters/swm6.xml')
 system = forcefield.createSystem(pdb.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds,
                                  defaultTholeWidth=8)
 integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 2*femtoseconds)
