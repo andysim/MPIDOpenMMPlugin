@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Technical Details - MPIDOpenMMPlugin Documentation and Notes</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700" />
+
+  <link rel="stylesheet" href="../css/theme.css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Technical Details";
+    var mkdocs_page_input_path = "technical.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../js/modernizr-2.8.3.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> MPIDOpenMMPlugin Documentation and Notes</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../building/">Installation</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../running/">Running the Code</a>
+                    </li>
+                </ul>
+                <ul class="current">
+                    <li class="toctree-l1 current"><a class="reference internal current" href="./">Technical Details</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#solvers">Solvers</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#direct-solver">Direct Solver</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#mutual-solver">Mutual Solver</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#extrapolated-solver">Extrapolated Solver</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#thole-damping">Thole Damping</a>
+    </li>
+    </ul>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../contributing/">Contributing</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../license/">License</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../authors/">Authors</a>
+                    </li>
+                </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">MPIDOpenMMPlugin Documentation and Notes</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Technical Details</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="polarization">Polarization</h1>
+<p>The induced dipoles are the solution to the <span class="arithmatex">\(3N\times3N\)</span> system of equations</p>
+<div class="arithmatex">\[
+\boldsymbol{\mu}_\mathrm{ind} = \mathbf{T}^{-1} \mathbf{E}
+\]</div>
+<p>where the electric field due to fixed multipoles is <span class="arithmatex">\(\mathbf{E}\)</span> and the
+coupling matrix</p>
+<div class="arithmatex">\[
+\mathbf{T} = \boldsymbol{\alpha}^{-1} + \boldsymbol{\tau}
+\]</div>
+<p>is given by the inverse of the diagonal matrix of atomic polarizabilities and the
+off-diagonal matrix that couples pairs of induced dipoles.  When generating the
+permanent field <span class="arithmatex">\(\mathbf{E}\)</span>, topologically excluded (1-2 and 1-3) interactions
+are neglected, and any 1-4 interactions are scaled, if requested.  All pairs of
+induced dipoles are allowed to interact, which is a key feature of the damping
+procedure described below.</p>
+<h2 id="solvers">Solvers</h2>
+<p>A few solvers are implemented for evaluating the induced dipoles, which we will
+briefly discuss.  These can be selected by passing the appropriate string to
+the <code>polarization</code> argument of <code>createSystem()</code>.</p>
+<h3 id="direct-solver">Direct Solver</h3>
+<p>The simplest "direct" solver simply uses the approximation</p>
+<div class="arithmatex">\[
+\mathbf{T} \approx \boldsymbol{\alpha}^{-1}
+\]</div>
+<p>which effectively removes the mutual interaction between induced dipoles.
+Because <span class="arithmatex">\(\boldsymbol{\alpha}\)</span> is diagonal, it is trivially invertible and the
+solution is fully analytic.  As a result, the energies and forces are
+rigorously consistent and integration can be performed exactly as for
+conventional fixed point charges.  However, this simplicity comes at the
+expense of the quality of the description of the electrostatics.</p>
+<h3 id="mutual-solver">Mutual Solver</h3>
+<p>The "mutual" solver keeps the interaction between induced dipoles, making
+<span class="arithmatex">\(\mathbf{T}\)</span> difficult to invert.  The induced dipole equations are solved
+iteratively, with the convergence accelerated by the direct inversion of the
+iterative subspace (DIIS) technique.  Because the coupling between dipoles is
+present this is the most accurate method, but it is also the most costly due to
+the need for multiple iterations to solve the equations.  While it might be
+tempting for to lower the convergence criterion to save time, this will lead to
+inconsistencies in the energies and forces, and runaway heating (or cooling) of
+the microcanonical ensemble will result.  We recommend converging the equation
+to at least <span class="arithmatex">\(10^{-4}\)</span> if using this solver; the convergence is controlled by
+the <code>mutualInducedTargetEpsilon</code> argument to <code>createSystem()</code>, with a
+default value of <span class="arithmatex">\(10^{-5}\)</span>.</p>
+<h3 id="extrapolated-solver">Extrapolated Solver</h3>
+<p>Combining the strengths of both approaches, the <span class="arithmatex">\(n\)</span>th order Optimized
+Perturbation Theory <a href="http://dx.doi.org/10.1063/1.4964866">OPTn</a> solver treats
+the induced dipole coupling matrix as a small perturbation to the "direct"
+model, leading to a power series expansion that can be truncated at any order.
+Some empirical tuning yields the OPT<span class="arithmatex">\(n\)</span> family of methods.  At zeroth order,
+the "direct" solution is obtained.  Successively increasing the order increases
+the cost, with each order costing the equivalent of an iteration of the
+"mutual" solver.  Unlike loosely converged "mutual" solutions, the OPT<span class="arithmatex">\(n\)</span>
+solutions have energies and forces that are rigorously consistent at all levels
+of trunctions.  We recommend the third order "extrapolated" solver, OPT3, which
+is the default solver in this plugin.  Other levels of OPT solver may be
+selected by calling the <code>setExtrapolationCoefficients()</code> on the <code>MPIDForce</code>
+object.</p>
+<h2 id="thole-damping">Thole Damping</h2>
+<p>If a pair of polarizable particles get too close, they can strongly polarize
+each other and at some distance this overpolarization will become infinite;
+this is often refered to as the "polarization catastrophe".  Thole
+<a href="https://doi.org/10.1016/0301-0104(81)85176-2">introduced</a> a clever damping
+that effectively gives the point dipoles a finite width and removes the
+singularity responsible for terms blowing up at short range.  The density
+ascribed to MPID's induced dipoles corresponds to Thole's <span class="arithmatex">\(\rho_1\)</span> choice (in
+contrast to AMOEBA, which uses <span class="arithmatex">\(\rho_2\)</span>):</p>
+<div class="arithmatex">\[
+ \rho_1 = \frac{a^3}{8\pi}e^{-a u}
+\]</div>
+<p>where <span class="arithmatex">\(a\)</span> is a unitless width parameter and <span class="arithmatex">\(u\)</span> is a dimensionless distance.
+The result of introducing this density is that interactions between a pair of
+induced dipoles is scaled by a factor</p>
+<div class="arithmatex">\[
+ 1 - e^{-a u}(1 + au + \frac{(a u)^2}{2}).
+\]</div>
+<p>For <a href="https://doi.org/10.1063/1.4984113">MPID</a>, the dimensionless distance for a
+pair of interacting atoms <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span> is given by their separation, <span class="arithmatex">\(R_{ij}\)</span>,
+and the individual atomic polarizabilities <span class="arithmatex">\(\alpha_i\)</span> and <span class="arithmatex">\(\alpha_j\)</span> by</p>
+<div class="arithmatex">\[
+ u = \frac{R_{ij}}{\alpha_i\alpha_j}.
+\]</div>
+<p>If the polarizability of and atom is anisotropic, the average of the three
+diagonal tensor elements is used.  The dimensionless width parameter <span class="arithmatex">\(a\)</span> is
+given a default value that is used for any interaction that is not excluded
+(1-2, 1-3 and, if <code>coulomb14scale</code> is zero, 1-4 connected pairs); this default
+value is controlled by the <code>defaultTholeWidth</code> argument to either the XML force
+field file or <code>createSystem()</code>.  The excluded interactions do not contribute to
+permanent-permenent moment interactions, or to forming the electric field
+<span class="arithmatex">\(\mathbf{E}\)</span> used to define the induced dipoles.  For <code>mutual</code> and
+<code>extrapolated</code> solvers, the induced dipoles are allowed to interact with each
+other.  These interactions are not subject to excluded rules.  For pairs that
+are not excluded due to topology, the <code>defaultTholeWidth</code> parameter is used to
+define <span class="arithmatex">\(a\)</span>.  For pairs that are excluded due to topology, we use the individual
+Thole widths defined in the parameter file and define <span class="arithmatex">\(a=a_i + a_j\)</span>.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../contributing/" class="btn btn-neutral float-right" title="Contributing">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../running/" class="btn btn-neutral" title="Running the Code"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../running/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../contributing/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../javascripts/config.js" defer></script>
+      <script src="https://polyfill.io/v3/polyfill.min.js?features=es6" defer></script>
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>

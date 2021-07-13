@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Running the Code - MPIDOpenMMPlugin Documentation and Notes</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700" />
+
+  <link rel="stylesheet" href="../css/theme.css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Running the Code";
+    var mkdocs_page_input_path = "running.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../js/modernizr-2.8.3.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> MPIDOpenMMPlugin Documentation and Notes</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../building/">Installation</a>
+                    </li>
+                </ul>
+                <ul class="current">
+                    <li class="toctree-l1 current"><a class="reference internal current" href="./">Running the Code</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#specifying-the-parameters">Specifying the Parameters</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#units">Units</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#the-xml-file">The XML file</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#creating-a-system">Creating a System</a>
+    </li>
+    </ul>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../technical/">Technical Details</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../contributing/">Contributing</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../license/">License</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../authors/">Authors</a>
+                    </li>
+                </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">MPIDOpenMMPlugin Documentation and Notes</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Running the Code</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="running-the-plugin">Running the Plugin</h1>
+<p>The following is a brief summary of the <a href="https://github.com/andysim/MPIDOpenMMPlugin/tree/master/examples">simple
+examples</a>
+included in the repository.  The usage of the plugin follows <a href="http://docs.openmm.org/latest/userguide/index.htmlr">standard OpenMM
+practices</a>] so that would
+be a good place to start for anybody unfamiliar with OpenMM.</p>
+<h2 id="specifying-the-parameters">Specifying the Parameters</h2>
+<h3 id="units">Units</h3>
+<p>OpenMM uses the following units:</p>
+<ul>
+<li>Time: <span class="arithmatex">\(ps\)</span></li>
+<li>Energy: <span class="arithmatex">\(kJ/mol\)</span></li>
+<li>Distance: <span class="arithmatex">\(nm\)</span></li>
+<li>Mass: <span class="arithmatex">\(amu\)</span></li>
+<li>Temperature: <span class="arithmatex">\(K\)</span></li>
+<li>Charge: <span class="arithmatex">\(e\)</span></li>
+<li>Angle: <span class="arithmatex">\(rad\)</span></li>
+</ul>
+<p>This choice ensures that forces obtained from <span class="arithmatex">\(F=ma\)</span> are consistent with those
+obtained from <span class="arithmatex">\(F=-\frac{\mathrm{d}U}{\mathrm{d}R}\)</span> without the need for scale
+factors.</p>
+<h2 id="the-xml-file">The XML file</h2>
+<p>Parameters should be specified using a standard <a href="http://docs.openmm.org/latest/userguide/application.html#writing-the-xml-file">OpenMM XML
+file</a>.
+As an illustrative example, here is the full specification of the MPID
+implementation of the <a href="https://doi.org/10.1063/1.4774577">SWM6</a> water model:</p>
+<pre><code class="language-xml">&lt;ForceField&gt;
+ &lt;AtomTypes&gt;
+  &lt;Type name=&quot;OT&quot; class=&quot;OW&quot; element=&quot;O&quot; mass=&quot;15.999&quot;/&gt;
+  &lt;Type name=&quot;HT&quot; class=&quot;HW&quot; element=&quot;H&quot; mass=&quot;1.008&quot;/&gt;
+ &lt;/AtomTypes&gt;
+ &lt;Residues&gt;
+  &lt;Residue name=&quot;HOH&quot;&gt;
+   &lt;Atom name=&quot;H1&quot; type=&quot;HT&quot;/&gt;
+   &lt;Atom name=&quot;H2&quot; type=&quot;HT&quot;/&gt;
+   &lt;Atom name=&quot;O&quot; type=&quot;OT&quot;/&gt;
+   &lt;Bond from=&quot;0&quot; to=&quot;2&quot;/&gt;
+   &lt;Bond from=&quot;1&quot; to=&quot;2&quot;/&gt;
+ &lt;/Residue&gt;
+ &lt;/Residues&gt;
+ &lt;HarmonicBondForce&gt;
+  &lt;Bond class1=&quot;OW&quot; class2=&quot;HW&quot; length=&quot;0.09572&quot; k=&quot;376560&quot;/&gt;
+ &lt;/HarmonicBondForce&gt;
+ &lt;HarmonicAngleForce&gt;
+  &lt;Angle class1=&quot;HW&quot; class2=&quot;OW&quot; class3=&quot;HW&quot; angle=&quot;1.82421813418&quot; k=&quot;460.24&quot;/&gt;
+ &lt;/HarmonicAngleForce&gt;
+ &lt;NonbondedForce coulomb14scale=&quot;0.833333&quot; lj14scale=&quot;0.5&quot;&gt;
+  &lt;Atom type=&quot;OT&quot; charge=&quot;-0.0&quot; sigma=&quot;0.31983264&quot; epsilon=&quot;0.677808&quot;/&gt;
+  &lt;Atom type=&quot;HT&quot; charge=&quot;0.0&quot; sigma=&quot;1&quot; epsilon=&quot;0&quot;/&gt;
+ &lt;/NonbondedForce&gt;
+ &lt;MPIDForce coulomb14scale=&quot;0.833333&quot; defaultTholeWidth=&quot;8.0&quot;&gt;
+   &lt;Multipole type=&quot;OT&quot; kz=&quot;-HT&quot; kx=&quot;-HT&quot;
+             c0=&quot;-1.0614&quot;
+             dX=&quot;0.0&quot; dY=&quot;0.0&quot;  dZ=&quot;-0.023671684&quot;
+             qXX=&quot;0.000150963&quot; qXY=&quot;0.0&quot; qYY=&quot;0.00008707&quot; qXZ=&quot;0.0&quot; qYZ=&quot;0.0&quot; qZZ=&quot;-0.000238034&quot;
+             oXXX=&quot;0.0&quot; oXXY=&quot;0.0&quot; oXYY=&quot;0.0&quot; oYYY=&quot;0.0&quot; oXXZ=&quot;0.000000426&quot; oXYZ=&quot;0.0&quot; oYYZ=&quot;0.000000853&quot; oXZZ=&quot;0.0&quot; oYZZ=&quot;0.0&quot; oZZZ=&quot;-0.000001279&quot;
+             /&gt;
+   &lt;Multipole type=&quot;HT&quot; kz=&quot;OT&quot; kx=&quot;HT&quot;
+             c0=&quot;0.5307&quot;
+             dX=&quot;0.0&quot; dY=&quot;0.0&quot;  dZ=&quot;0.0&quot;
+             qXX=&quot;0.0&quot; qXY=&quot;0.0&quot; qYY=&quot;0.0&quot; qXZ=&quot;0.0&quot; qYZ=&quot;0.0&quot; qZZ=&quot;0.0&quot;
+             oXXX=&quot;0.0&quot; oXXY=&quot;0.0&quot; oXYY=&quot;0.0&quot; oYYY=&quot;0.0&quot; oXXZ=&quot;0.0&quot; oXYZ=&quot;0.0&quot; oYYZ=&quot;0.0&quot; oXZZ=&quot;0.0&quot; oYZZ=&quot;0.0&quot; oZZZ=&quot;0.0&quot;
+             /&gt;
+   &lt;Polarize type=&quot;OT&quot; polarizabilityXX=&quot;0.00088&quot; polarizabilityYY=&quot;0.00088&quot; polarizabilityZZ=&quot;0.00088&quot; thole=&quot;8.0&quot;/&gt;
+   &lt;Polarize type=&quot;HT&quot; polarizabilityXX=&quot;0.000&quot; polarizabilityYY=&quot;0.000&quot; polarizabilityZZ=&quot;0.000&quot; thole=&quot;0.0&quot;/&gt;
+ &lt;/MPIDForce&gt;
+&lt;/ForceField&gt;
+</code></pre>
+<p>Most of this file sets up bonded terms, which are well described in the OpenMM
+documentation linked above.  When defining the <code>NonbondedForce</code>, note that the
+charges are defined as zero; this is because all electrostatic terms are to be
+handled by the <code>MPIDForce</code>.  The <code>MPIDForce</code> does not handle Lennard-Jones (LJ)
+terms, so these are still processed by the <code>NonbondedForce</code>, which can also use
+particle mesh Ewald (PME) to compute the LJ terms effectively without cutoffs.
+The section defining the <code>MPIDForce</code> terms looks like this:</p>
+<pre><code class="language-xml"> &lt;MPIDForce coulomb14scale=&quot;0.833333&quot; defaultTholeWidth=&quot;8.0&quot;&gt;
+   &lt;Multipole type=&quot;OT&quot; kz=&quot;-HT&quot; kx=&quot;-HT&quot;
+             c0=&quot;-1.0614&quot;
+             dX=&quot;0.0&quot; dY=&quot;0.0&quot;  dZ=&quot;-0.023671684&quot;
+             qXX=&quot;0.000150963&quot; qXY=&quot;0.0&quot; qYY=&quot;0.00008707&quot; qXZ=&quot;0.0&quot; qYZ=&quot;0.0&quot; qZZ=&quot;-0.000238034&quot;
+             oXXX=&quot;0.0&quot; oXXY=&quot;0.0&quot; oXYY=&quot;0.0&quot; oYYY=&quot;0.0&quot; oXXZ=&quot;0.000000426&quot; oXYZ=&quot;0.0&quot; oYYZ=&quot;0.000000853&quot; oXZZ=&quot;0.0&quot; oYZZ=&quot;0.0&quot; oZZZ=&quot;-0.000001279&quot;
+             /&gt;
+   &lt;Multipole type=&quot;HT&quot; kz=&quot;OT&quot; kx=&quot;HT&quot;
+             c0=&quot;0.5307&quot;
+             dX=&quot;0.0&quot; dY=&quot;0.0&quot;  dZ=&quot;0.0&quot;
+             qXX=&quot;0.0&quot; qXY=&quot;0.0&quot; qYY=&quot;0.0&quot; qXZ=&quot;0.0&quot; qYZ=&quot;0.0&quot; qZZ=&quot;0.0&quot;
+             oXXX=&quot;0.0&quot; oXXY=&quot;0.0&quot; oXYY=&quot;0.0&quot; oYYY=&quot;0.0&quot; oXXZ=&quot;0.0&quot; oXYZ=&quot;0.0&quot; oYYZ=&quot;0.0&quot; oXZZ=&quot;0.0&quot; oYZZ=&quot;0.0&quot; oZZZ=&quot;0.0&quot;
+             /&gt;
+   &lt;Polarize type=&quot;OT&quot; polarizabilityXX=&quot;0.00088&quot; polarizabilityYY=&quot;0.00088&quot; polarizabilityZZ=&quot;0.00088&quot; thole=&quot;8.0&quot;/&gt;
+   &lt;Polarize type=&quot;HT&quot; polarizabilityXX=&quot;0.000&quot; polarizabilityYY=&quot;0.000&quot; polarizabilityZZ=&quot;0.000&quot; thole=&quot;0.0&quot;/&gt;
+ &lt;/MPIDForce&gt;
+</code></pre>
+<p>The global <code>coulomb14scale</code> parameter controls the scale factor applied to
+interactions that are topologically three bonds apart, and defaults to 1 (the
+correct value for MPID) if omitted.  The <code>defaultTholeWidth</code> parameter is the
+[Thole damping] (technical.md#thole-damping) parameter that's applied to
+particles whose interaction is not neglected due to topological reasons.</p>
+<p>Multipoles are defined by providing orientation rules, defining their
+orientation with respect to "anchor" atoms within the same system and the
+syntax follows the <a href="https://pubs.acs.org/doi/10.1021/ct200304d">conventions
+used</a> in the AMOEBA force field.
+For example, <code>Multipole type="OT" kz="-HT" kx="-HT"</code> defines a multipole on the
+<code>OT</code> atom, whose z direction is defined as the bisector of the two <code>HT</code> atoms
+directly connected to it, with the <span class="arithmatex">\(x\)</span> direction defined by the plane
+containing both <code>HT</code>.  The <code>Multipole type="HT" kz="OT" kx="HT"</code> similarly
+defines a multipole on <code>HT</code>, whose local <code>z</code> axis is defined by its bond to the
+<code>OT</code> atom; the <span class="arithmatex">\(x\)</span> axis is then defined by the plane containing the other <code>HT</code>
+atom.</p>
+<p>The <code>c0</code> entry defines the charge (in <span class="arithmatex">\(e\)</span>), while <code>dX</code> defines the <span class="arithmatex">\(x\)</span>
+component of the dipole in <span class="arithmatex">\(e/nm\)</span>, <em>etc.</em>.  Multipoles up to octopoles are
+supported, and any values omitted are assumed to be zero.</p>
+<p>The <code>Polarize</code> tag is optional and is used to define a given atom as
+polarizable.  The <span class="arithmatex">\(xx\)</span>, <span class="arithmatex">\(yy\)</span> and <span class="arithmatex">\(zz\)</span> elements of the polarizability tensor
+should be specified individually, in the axis system used to define the
+multipoles described above.  If all three components of the polarizability
+tensor are equal, the polarizability is isotropic and the orientation rules are
+irrelevant.  The Thole damping parameter, <a href="../technical/#thole-damping">detailed
+here</a> is a unitless parameter used to dampen
+topologically excluded interactions between pairs of induced dipoles if the
+chosen solver considers them.</p>
+<h2 id="creating-a-system">Creating a System</h2>
+<p>With the appropriate XML-formatted force field in hand, setting up a simulation
+follows the <a href="http://docs.openmm.org/latest/userguide/application.html#a-first-example">standard OpenMM
+approach</a>.
+The <code>createSystem()</code> function from the <code>ForceField</code> class, which is used to
+build the system obeys all of the <a href="http://docs.openmm.org/development/api-python/generated/openmm.app.forcefield.ForceField.html#openmm.app.forcefield.ForceField.createSystem">usual
+arguments</a>
+for controlling constraint algorithms, hydrogen mass repartitioning,
+cutoffs, <em>etc.</em>.  For <code>MPIDForce</code>, the <code>defaultTholeWidth</code> and
+<code>coulomb14scale</code> arguments may be provided, overriding any values that may be
+present in the XML parameter file described above.  The <code>polarization</code> argument
+is used to control the <a href="../technical/#solvers">polarization solver</a>.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../technical/" class="btn btn-neutral float-right" title="Technical Details">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../building/" class="btn btn-neutral" title="Installation"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../building/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../technical/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../javascripts/config.js" defer></script>
+      <script src="https://polyfill.io/v3/polyfill.min.js?features=es6" defer></script>
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>
