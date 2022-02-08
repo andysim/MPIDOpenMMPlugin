@@ -1,6 +1,6 @@
 %module mpidplugin
 
-%import(module="simtk.openmm") "swig/OpenMMSwigHeaders.i"
+%import(module="openmm") "swig/OpenMMSwigHeaders.i"
 %include "swig/typemaps.i"
 
 /*
@@ -25,8 +25,8 @@ namespace std {
 %}
 
 %pythoncode %{
-import simtk.openmm as mm
-import simtk.unit as unit
+import openmm as mm
+import openmm.unit as unit
 %}
 
 /*
@@ -518,7 +518,7 @@ public:
 };
 
 %pythoncode %{
-import simtk.openmm.app.forcefield as forcefield
+import openmm.app.forcefield as forcefield
 import warnings
 
 ## @private

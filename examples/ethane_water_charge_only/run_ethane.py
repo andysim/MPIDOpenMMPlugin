@@ -1,7 +1,7 @@
-from simtk.openmm.app import *
-from simtk.openmm import *
-from simtk.unit import *
-import simtk.openmm.app.element as elem
+from openmm.app import *
+from openmm import *
+from openmm.unit import *
+import openmm.app.element as elem
 from sys import stdout, argv
 import mpidplugin
 import numpy as np
@@ -42,7 +42,8 @@ print("Running on ", context.getPlatform().getName(), " Device ID:", deviceid)
 
 # Initialize
 context.setPositions(pdb.positions)
-#simulation.loadState('equilibrated.xml')
+if os.path.isfile('equilibrated.xml'):
+    simulation.loadState('equilibrated.xml')
 
 # Dump trajectory info every 10ps
 #simulation.reporters.append(DCDReporter('trajectory.dcd', 5000))

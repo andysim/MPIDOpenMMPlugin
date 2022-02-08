@@ -1,7 +1,7 @@
-from simtk.openmm.app import *
-from simtk.openmm import *
-from simtk.unit import *
-import simtk.openmm.app.element as elem
+from openmm.app import *
+from openmm import *
+from openmm.unit import *
+import openmm.app.element as elem
 from sys import stdout, argv
 import mpidplugin
 import numpy as np

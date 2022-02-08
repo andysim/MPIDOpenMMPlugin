@@ -1,7 +1,7 @@
-from simtk.openmm.app import *
-from simtk.openmm import *
-from simtk.unit import *
-import simtk.openmm.app.element as elem
+from openmm.app import *
+from openmm import *
+from openmm.unit import *
+import openmm.app.element as elem
 from sys import stdout, argv
 import mpidplugin
 import numpy as np
@@ -15,7 +15,7 @@ pdb = PDBFile('waterdimer_aligned.pdb')
 forcefield = ForceField('charmm_polar_2019.xml')
 modeller = Modeller(pdb.topology, pdb.positions)
 modeller.addExtraParticles(forcefield)
-system = forcefield.createSystem(modeller.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds, defaultTholeWidth=5)
+system = forcefield.createSystem(modeller.topology, nonbondedMethod=LJPME, nonbondedCutoff=8*angstrom, constraints=HBonds)
 integrator = DrudeSCFIntegrator(1e-10*femtoseconds)
 integrator.setMinimizationErrorTolerance(1e-12)
 

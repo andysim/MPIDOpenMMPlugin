@@ -7,7 +7,8 @@ git clone git@github.com:andysim/MPIDOpenMMPlugin
 
 # Dependencies
 
-The code needs OpenMM version 7.5 or later, which can be installed as follows.
+The code needs OpenMM version 7.6 or later (tested with 7.7), which can be
+installed as follows.
 
 ## Installation of Dependencies via Conda
 
@@ -15,9 +16,9 @@ Conda is *strongly* recommended for managing the environment and dependencies;
 after [downloading](https://conda.io/docs/download.html) anaconda (make sure
 you use `bash` or `zsh`).
 
-To install the 7.5 verion of OpenMM into its own Conda environment called `mpid`, run
+To install the 7.7 verion of OpenMM into its own Conda environment called `mpid`, run
 ``` bash
-conda create -n mpid openmm=7.5 cudatoolkit=10.2 swig mdtraj -c conda-forge
+conda create -n mpid openmm=7.7 cudatoolkit=10.2 swig mdtraj -c conda-forge
 ```
 Make sure you request the version of the CUDA toolkit supported on your
 cluster.  This example uses GCC to build; the speed of the C++ compiler is
