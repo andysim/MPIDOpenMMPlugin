@@ -25,7 +25,7 @@ __device__ float computePScaleFactor(uint2 covalent, int index) {
     int mask = 1<<index;
     bool x = (covalent.x & mask);
     bool y = (covalent.y & mask);
-    return (x && y ? 0.0f : (float) SCALEFACTOR14);
+	return (x ? (y ? 0.0f : (float) SCALEFACTOR14): 1.0f);
 }
 
 inline __device__ void zeroAtomData(AtomData& data) {
