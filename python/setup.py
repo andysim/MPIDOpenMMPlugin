@@ -3,6 +3,7 @@ from distutils.extension import Extension
 import os
 import sys
 import platform
+import numpy
 
 openmm_dir = '@OPENMM_DIR@'
 mpidplugin_header_dir = '@MPIDPLUGIN_HEADER_DIR@'
@@ -19,7 +20,7 @@ if platform.system() == 'Darwin':
 extension = Extension(name='_mpidplugin',
                       sources=['MPIDPluginWrapper.cpp'],
                       libraries=['OpenMM', 'MPIDPlugin'],
-                      include_dirs=[os.path.join(openmm_dir, 'include'), mpidplugin_header_dir],
+                      include_dirs=[os.path.join(openmm_dir, 'include'), mpidplugin_header_dir, numpy.get_include()],
                       library_dirs=[os.path.join(openmm_dir, 'lib'), mpidplugin_library_dir],
                       extra_compile_args=extra_compile_args,
                       extra_link_args=extra_link_args

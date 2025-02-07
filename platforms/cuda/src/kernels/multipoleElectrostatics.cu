@@ -49,14 +49,14 @@ __device__ float computeMScaleFactor(uint2 covalent, int index) {
     int mask = 1<<index;
     bool x = (covalent.x & mask);
     bool y = (covalent.y & mask);
-    return (x && y ? 0.0f : (float) SCALEFACTOR14);
+	return (x ? (y ? 0.0f : (float) SCALEFACTOR14): 1.0f);
 }
 
 __device__ float computePScaleFactor(uint2 covalent, int index) {
     int mask = 1<<index;
     bool x = (covalent.x & mask);
     bool y = (covalent.y & mask);
-    return (x && y ? 0.0f : (float) SCALEFACTOR14);
+	return (x ? (y ? 0.0f : (float) SCALEFACTOR14): 1.0f);
 }
 
 __device__ void computeOneInteraction(AtomData& atom1, AtomData& atom2, bool hasExclusions, float pScale, float mScale, float forceFactor, mixed& energy) {
